@@ -28,8 +28,9 @@ export const createUser = (data: NewUser): Promise<HydratedDocument<IUserModel>>
 export const getUserById = (userId: string): Promise<HydratedDocument<IUserModel> | null> => {
 
     // Buscamos el usuario usando el ID que hemos recibido.
-    // Esta ruta es solo para ADMIN, que puede ver tambien los usuarios borrados logicamente
-    return User.findById(userId);
+    // Esta ruta es solo para ADMIN, que puede ver tambien los usuarios borrados logicamente.
+    // Con populate sacamos los datos de las rutinas y no mostramos las borradas
+    return User.findById(userId).populate({ path: 'workouts', select: 'name dayOfWeek', match: { isDeleted: false } });
 
 };
 
@@ -95,6 +96,39 @@ export const updateUser = (userId: string, data: UpdateUserInput): Promise<Hydra
 
 };
 
+// Asigna una rutina a un usuario. Devuelve null si el usuario no existe.
+export const assignWorkout = async (userId: string, workoutId: string) => {
+
+    // $addToSet añade la rutina a la lista sin repetirla
+    const user = await User.findOneAndUpdate({ _id: userId, isDeleted: false }, { $addToSet: { workouts: workoutId } });
+
+    if (!user) {
+
+        return null;
+
+    }
+
+    // Buscamos el usuario otra vez para devolverlo con las rutinas
+    return getUserById(userId);
+
+};
+
+// Quita una rutina a un usuario. Devuelve null si el usuario no existe.
+export const removeWorkout = async (userId: string, workoutId: string) => {
+
+    // $pull saca la rutina de la lista
+    const user = await User.findOneAndUpdate({ _id: userId, isDeleted: false }, { $pull: { workouts: workoutId } });
+
+    if (!user) {
+
+        return null;
+
+    }
+
+    return getUserById(userId);
+
+};
+
 // Parametros de un listado: los que llegan ya validados por ValidateQuery
 // (sort es la columna por la que ordenar y order el sentido: asc o desc)
 export type ListUsersInput = { page: number; limit: number; search?: string; sort?: string; order?: 'asc' | 'desc' };
@@ -152,6 +186,10 @@ export default {
     softDeleteManyUsers,
 
     hardDeleteManyUsers,
+
+    assignWorkout,
+
+    removeWorkout,
 
     listUsers
 

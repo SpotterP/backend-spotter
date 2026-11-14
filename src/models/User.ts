@@ -18,6 +18,9 @@ export interface IUser {
     password: string;
 
     role: UserRole;
+
+    // Rutinas que el admin le ha asignado al usuario
+    workouts?: mongoose.Types.ObjectId[];
 }
 
 // Esta interfaz junta los datos del usuario con las propiedades de un documento de MongoDB
@@ -40,6 +43,9 @@ const UserSchema: Schema = new Schema(
 
         // Si no se indica, un usuario nuevo es USER. Los ADMIN se crean con el seed
         role: { type: String, enum: USER_ROLES, default: 'USER' },
+
+        // Rutinas asignadas al usuario. Son referencias al modelo Workout, como los ejercicios de una rutina
+        workouts: [{ type: Schema.Types.ObjectId, ref: 'Workout' }],
 
         // Marca de borrado logico: no borramos el usuario de la base de datos, solo lo ocultamos
         isDeleted: { type: Boolean, default: false },

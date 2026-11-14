@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import UserService from '../services/UserService';
+import WorkoutService from '../services/WorkoutService';
 
 // Devuelve los datos básicos de los usuarios (id y nombre) con paginación y buscador,
 // para que el frontend pueda mostrarlos.
@@ -169,5 +170,43 @@ const restoreUser = async (req: Request<{ userId: string }>, res: Response, next
     }
 };
 
+// Función para asignar una rutina a un usuario
+const assignWorkout = async (req: Request<{ userId: string; workoutId: string }>, res: Response, next: NextFunction) => {
+    try {
+        // Primero miramos que la rutina exista y no este borrada
+        const workout = await WorkoutService.getWorkoutById(req.params.workoutId, false);
+
+        if (!workout) {
+            return res.status(404).json({ message: 'workout not found' });
+        }
+
+        // Despues la asignamos al usuario
+        const user = await UserService.assignWorkout(req.params.userId, req.params.workoutId);
+
+        if (user) {
+            res.status(200).json({ user });
+        } else {
+            res.status(404).json({ message: 'user not found' });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Función para quitar una rutina a un usuario
+const removeWorkout = async (req: Request<{ userId: string; workoutId: string }>, res: Response, next: NextFunction) => {
+    try {
+        const user = await UserService.removeWorkout(req.params.userId, req.params.workoutId);
+
+        if (user) {
+            res.status(200).json({ user });
+        } else {
+            res.status(404).json({ message: 'not found' });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Exportamos todas las funciones para poder utilizarlas desde las rutas
-export default { listUsers, createUser, readUser, updateUser, softDeleteUser, restoreUser, hardDeleteUser, softDeleteManyUsers, hardDeleteManyUsers };
+export default { assignWorkout, removeWorkout, listUsers, createUser, readUser, updateUser, softDeleteUser, restoreUser, hardDeleteUser, softDeleteManyUsers, hardDeleteManyUsers };

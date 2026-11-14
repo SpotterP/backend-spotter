@@ -307,4 +307,60 @@ router.patch('/:userId/restore', RequireRole('ADMIN'), ValidateId('userId'), con
 // Borrado definitivo: solo ADMIN
 router.delete('/:userId/hard', RequireRole('ADMIN'), ValidateId('userId'), controller.hardDeleteUser);
 
+/**
+ * @openapi
+ * /users/{userId}/workouts/{workoutId}:
+ *   patch:
+ *     tags: [Users]
+ *     summary: Asigna una rutina a un usuario
+ *     description: >
+ *       Añade la rutina a la lista de rutinas del usuario. Si ya la tenía no se repite.
+ *       La rutina no puede estar borrada. Solo ADMIN.
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+ *       - in: path
+ *         name: workoutId
+ *         required: true
+ *         schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+ *     responses:
+ *       200: { description: El usuario con sus rutinas asignadas }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+
+// Asignar una rutina a un usuario: solo ADMIN
+router.patch('/:userId/workouts/:workoutId', RequireRole('ADMIN'), ValidateId('userId'), ValidateId('workoutId'), controller.assignWorkout);
+
+/**
+ * @openapi
+ * /users/{userId}/workouts/{workoutId}:
+ *   delete:
+ *     tags: [Users]
+ *     summary: Quita una rutina a un usuario
+ *     description: Saca la rutina de la lista del usuario. La rutina no se borra. Solo ADMIN.
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+ *       - in: path
+ *         name: workoutId
+ *         required: true
+ *         schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+ *     responses:
+ *       200: { description: El usuario con las rutinas que le quedan }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+
+// Quitar una rutina a un usuario: solo ADMIN
+router.delete('/:userId/workouts/:workoutId', RequireRole('ADMIN'), ValidateId('userId'), ValidateId('workoutId'), controller.removeWorkout);
+
 export = router;
