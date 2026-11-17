@@ -3,6 +3,7 @@ import controller from '../controllers/Users';
 
 import { Schemas, ValidateId, ValidateJoi, ValidateQuery } from '../middleware/Joi';
 import { RequireRole } from '../middleware/RequireRole';
+import { RequireSelfOrRole } from '../middleware/RequireSelfOrRole';
 
 // Agrupa las rutas relacionadas con los usuarios.
 const router = express.Router();
@@ -177,7 +178,9 @@ router.delete('/hard', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), co
  *   get:
  *     tags: [Users]
  *     summary: Devuelve un usuario
- *     description: La respuesta nunca lleva la contraseña; el modelo la quita en el toJSON.
+ *     description: >
+ *       Incluye sus rutinas asignadas. Solo ADMIN o el propio usuario.
+ *       La respuesta nunca lleva la contraseña; el modelo la quita en el toJSON.
  *     parameters:
  *       - in: path
  *         name: userId
@@ -193,10 +196,11 @@ router.delete('/hard', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), co
  */
 
 // Ruta para buscar un usuario por su ID
-// Solo ADMIN: el detalle devuelve el email y el rol de otro usuario, y eso no lo necesita el listado
+// ADMIN puede ver a cualquiera; un usuario normal solo se ve a si mismo (con sus rutinas).
+// El detalle lleva el email y el rol, por eso no se deja ver el de otros
 // (para eso esta el listado de arriba, que solo lleva el id y el nombre).
 // Antes de llamar al controlador comprobamos que el ID tiene el formato correcto
-router.get('/:userId', RequireRole('ADMIN'), ValidateId('userId'), controller.readUser);
+router.get('/:userId', RequireSelfOrRole('ADMIN'), ValidateId('userId'), controller.readUser);
 
 /**
  * @openapi
@@ -315,7 +319,7 @@ router.delete('/:userId/hard', RequireRole('ADMIN'), ValidateId('userId'), contr
  *     summary: Asigna una rutina a un usuario
  *     description: >
  *       Añade la rutina a la lista de rutinas del usuario. Si ya la tenía no se repite.
- *       La rutina no puede estar borrada. Solo ADMIN.
+ *       La rutina no puede estar borrada. Solo ADMIN o el propio usuario.
  *     parameters:
  *       - in: path
  *         name: userId
@@ -333,8 +337,8 @@ router.delete('/:userId/hard', RequireRole('ADMIN'), ValidateId('userId'), contr
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 
-// Asignar una rutina a un usuario: solo ADMIN
-router.patch('/:userId/workouts/:workoutId', RequireRole('ADMIN'), ValidateId('userId'), ValidateId('workoutId'), controller.assignWorkout);
+// Asignar una rutina: ADMIN o el propio usuario
+router.patch('/:userId/workouts/:workoutId', RequireSelfOrRole('ADMIN'), ValidateId('userId'), ValidateId('workoutId'), controller.assignWorkout);
 
 /**
  * @openapi
@@ -342,7 +346,7 @@ router.patch('/:userId/workouts/:workoutId', RequireRole('ADMIN'), ValidateId('u
  *   delete:
  *     tags: [Users]
  *     summary: Quita una rutina a un usuario
- *     description: Saca la rutina de la lista del usuario. La rutina no se borra. Solo ADMIN.
+ *     description: Saca la rutina de la lista del usuario. La rutina no se borra. Solo ADMIN o el propio usuario.
  *     parameters:
  *       - in: path
  *         name: userId
@@ -360,7 +364,7 @@ router.patch('/:userId/workouts/:workoutId', RequireRole('ADMIN'), ValidateId('u
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 
-// Quitar una rutina a un usuario: solo ADMIN
-router.delete('/:userId/workouts/:workoutId', RequireRole('ADMIN'), ValidateId('userId'), ValidateId('workoutId'), controller.removeWorkout);
+// Quitar una rutina: ADMIN o el propio usuario
+router.delete('/:userId/workouts/:workoutId', RequireSelfOrRole('ADMIN'), ValidateId('userId'), ValidateId('workoutId'), controller.removeWorkout);
 
 export = router;
