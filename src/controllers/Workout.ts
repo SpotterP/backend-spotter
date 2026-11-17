@@ -6,7 +6,9 @@ import WorkoutService from '../services/WorkoutService';
 const createWorkout = async (req: Request, res: Response, next: NextFunction) => {
     try {
         // La rutina creada desde el backoffice es del ADMIN que la crea
-        const workout = await WorkoutService.createWorkout(req.body, req.user!.id);
+        // El ADMIN puede indicar el dueño (owner); si no lo indica, la rutina es suya
+        const { owner, ...data } = req.body;
+        const workout = await WorkoutService.createWorkout(data, owner ?? req.user!.id);
 
         // Si se ha creado correctamente devolvemos la rutina creada
         // El codigo 201 indica que se ha creado un recurso nuevo
@@ -52,7 +54,13 @@ const updateWorkout = async (req: Request<{ workoutId: string }>, res: Response,
 
     try {
         // Pasamos al servicio el ID de la rutina y los nuevos datos
-        const workout = await WorkoutService.updateWorkout(workoutId, req.body);
+        // Solo un ADMIN puede cambiar el dueño de una rutina: si lo envia un usuario normal, se ignora
+        const data = { ...req.body };
+        if (req.user?.role !== 'ADMIN') {
+            delete data.owner;
+        }
+
+        const workout = await WorkoutService.updateWorkout(workoutId, data);
 
         // Comprobamos si se ha encontrado y actualizado la rutina
         if (workout) {

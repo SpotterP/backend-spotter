@@ -15,6 +15,7 @@ const { swagger: refreshInput } = j2s(Schemas.auth.refresh);
 const { swagger: userInput } = j2s(Schemas.user.create);
 const { swagger: exerciseInput } = j2s(Schemas.exercise.create);
 const { swagger: workoutInput } = j2s(Schemas.workout.create);
+const { swagger: workoutAdminInput } = j2s(Schemas.workout.adminCreate);
 const { swagger: sessionInput } = j2s(Schemas.session.create);
 
 // Lo que devuelve la API no es igual a lo que se envía: lleva el _id, las fechas que
@@ -179,6 +180,7 @@ const swaggerDocument = swaggerJsdoc({
                 ExerciseInput: exerciseInput,
                 Exercise: exerciseSchema,
                 WorkoutInput: workoutInput,
+                WorkoutAdminInput: workoutAdminInput,
                 Workout: workoutSchema,
                 WorkoutPopulated: populatedWorkoutSchema,
                 SessionInput: sessionInput,
