@@ -36,6 +36,24 @@ const createUser = async (req: Request, res: Response, next: NextFunction) => {
     }
 };
 
+// Función para ver el perfil del usuario de la sesión (GET /users/me)
+// El id sale del token (req.user), no de la URL, asi que cada usuario solo ve el suyo
+const readMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const user = await UserService.getMe(req.user!.id);
+
+        if (user) {
+            // Devolvemos _id, name y email
+            res.status(200).json({ user });
+        } else {
+            // El usuario del token ya no existe (por ejemplo, lo han borrado)
+            res.status(404).json({ message: 'not found' });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Función para buscar un usuario concreto a partir de su ID
 // El modelo quita la contraseña en el toJSON, asi que la respuesta nunca la lleva
 const readUser = async (req: Request<{ userId: string }>, res: Response, next: NextFunction) => {
@@ -170,4 +188,4 @@ const restoreUser = async (req: Request<{ userId: string }>, res: Response, next
 };
 
 // Exportamos todas las funciones para poder utilizarlas desde las rutas
-export default { listUsers, createUser, readUser, updateUser, softDeleteUser, restoreUser, hardDeleteUser, softDeleteManyUsers, hardDeleteManyUsers };
+export default { listUsers, readMe, createUser, readUser, updateUser, softDeleteUser, restoreUser, hardDeleteUser, softDeleteManyUsers, hardDeleteManyUsers };

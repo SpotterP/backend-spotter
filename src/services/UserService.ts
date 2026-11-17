@@ -33,6 +33,13 @@ export const getUserById = (userId: string): Promise<HydratedDocument<IUserModel
 
 };
 
+// Datos del perfil del propio usuario (id, nombre y email). Devuelve null si ya no existe o esta borrado
+export const getMe = (userId: string): Promise<HydratedDocument<IUserModel> | null> => {
+
+    return User.findOne({ _id: userId, isDeleted: false }).select('name email');
+
+};
+
 // Borrado logico: el usuario sigue en la base de datos, pero marcado como borrado.
 // Deja de salir en los listados y su email queda libre (indice unico parcial del modelo).
 // Devuelve null si no existe o ya estaba borrado.
@@ -140,6 +147,8 @@ export default {
     createUser,
 
     getUserById,
+
+    getMe,
 
     updateUser,
 
