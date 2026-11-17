@@ -46,8 +46,8 @@ export const getWorkoutById = (workoutId: string, isAdmin: boolean): Promise<Wor
     // Con el rol ADMIN buscamos por ID a secas; el resto exige ademas isDeleted: false.
     // En los dos casos cargamos los ejercicios referenciados.
     return isAdmin
-        ? Workout.findById(workoutId).populate('exercises.exercise')
-        : Workout.findOne({ _id: workoutId, isDeleted: false }).populate('exercises.exercise');
+        ? Workout.findById(workoutId).populate('exercises.exercise').populate('owner', 'name')
+        : Workout.findOne({ _id: workoutId, isDeleted: false }).populate('exercises.exercise').populate('owner', 'name');
 
 };
 
@@ -109,11 +109,11 @@ export const updateWorkout = async (workoutId: string, data: UpdateWorkoutInput,
 
 // Parametros de un listado: los que llegan ya validados por ValidateQuery
 // (sort es la columna por la que ordenar y order el sentido: asc o desc)
-export type ListWorkoutsInput = { page: number; limit: number; search?: string; day?: DayOfWeek; sort?: string; order?: 'asc' | 'desc' };
+export type ListWorkoutsInput = { page: number; limit: number; search?: string; day?: DayOfWeek; owner?: string; sort?: string; order?: 'asc' | 'desc' };
 
 // Devuelve una pagina de rutinas, filtrada por dia y/o por texto en nombre o descripcion.
 // El ADMIN ve todas las rutinas; cualquier otra sesion solo las activas (isDeleted: false).
-export const listWorkouts = async ({ page, limit, search, day, sort, order }: ListWorkoutsInput, isAdmin: boolean) => {
+export const listWorkouts = async ({ page, limit, search, day, owner, sort, order }: ListWorkoutsInput, isAdmin: boolean) => {
 
     // El ADMIN consulta todo, asi que su filtro empieza vacio; el resto empieza solo con las activas
     const filter: Record<string, unknown> = isAdmin ? {} : { isDeleted: false };
@@ -121,6 +121,11 @@ export const listWorkouts = async ({ page, limit, search, day, sort, order }: Li
     // Filtro por dia de la semana (rutinas que incluyen ese dia), si se ha pedido
     if (day) {
         filter.days = day;
+    }
+
+    // Filtro por dueño: solo las rutinas de ese usuario, si se ha pedido
+    if (owner) {
+        filter.owner = owner;
     }
 
     // Buscador: el texto puede estar en el nombre O en la descripcion
@@ -132,7 +137,7 @@ export const listWorkouts = async ({ page, limit, search, day, sort, order }: Li
     // Pedimos la pagina y el total a la vez, con el MISMO filtro
     const [workouts, total] = await Promise.all([
         // Ordenamos por la columna pedida (por defecto el nombre)
-        Workout.find(filter).sort(buildSort(sort, order, 'name')).skip(getSkip(page, limit)).limit(limit).populate('exercises.exercise'),
+        Workout.find(filter).sort(buildSort(sort, order, 'name')).skip(getSkip(page, limit)).limit(limit).populate('exercises.exercise').populate('owner', 'name'),
         Workout.countDocuments(filter)
     ]);
 

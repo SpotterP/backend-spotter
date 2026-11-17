@@ -16,14 +16,14 @@ const router = express.Router();
  *     tags: [Workouts]
  *     summary: Crea una rutina
  *     description: >
- *       Solo un ADMIN puede crear rutinas.
- *       Los ejercicios se envian como una lista de ids (textos) de ejercicios ya existentes.
- *       La respuesta devuelve la rutina guardada, con esos mismos ids en exercises.
+ *       Solo un ADMIN puede crear rutinas. Puede indicar el dueño con `owner` (id de un usuario);
+ *       si no lo indica, la rutina es del propio ADMIN. Cada ejercicio se envia como
+ *       { exercise, sets, reps } y el orden de la lista es el orden de la rutina.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
- *           schema: { $ref: '#/components/schemas/WorkoutInput' }
+ *           schema: { $ref: '#/components/schemas/WorkoutAdminInput' }
  *     responses:
  *       201:
  *         description: Rutina creada
@@ -44,7 +44,7 @@ const router = express.Router();
  *     tags: [Workouts]
  *     summary: Lista las rutinas con paginación y buscador
  *     description: >
- *       Cada rutina lleva sus ejercicios completos. El buscador mira el nombre y la descripción.
+ *       Cada rutina lleva sus ejercicios completos y su dueño (`owner`, con su id y su nombre). El buscador mira el nombre y la descripción.
  *       Cualquier sesión con token puede consultarlo: un ADMIN ve todas las rutinas, también las
  *       borradas; el resto de usuarios solo ve las activas.
  *     parameters:
@@ -62,6 +62,10 @@ const router = express.Router();
  *         name: day
  *         description: Solo las rutinas que incluyen este día
  *         schema: { type: string, enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY] }
+ *       - in: query
+ *         name: owner
+ *         description: Solo las rutinas de este usuario (id del dueño)
+ *         schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
  *       - in: query
  *         name: sort
  *         description: Columna por la que se ordena (por defecto name)
@@ -103,7 +107,7 @@ router.get('/', ValidateQuery(Schemas.query.workout), controller.listWorkouts);
 // Solo ADMIN: escribir en el catalogo es cosa del backoffice
 // Primero comprobamos que los datos cumplen el esquema de Joi
 // Si son correctos llamamos a la funcion createWorkout del controlador
-router.post('/', RequireRole('ADMIN'), ValidateJoi(Schemas.workout.create), controller.createWorkout);
+router.post('/', RequireRole('ADMIN'), ValidateJoi(Schemas.workout.adminCreate), controller.createWorkout);
 
 /**
  * @openapi
@@ -219,8 +223,8 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  *     summary: Reemplaza los datos de una rutina
  *     description: >
  *       Hay que enviar la rutina entera, no solo los campos que cambian.
- *       Los ejercicios se envian como una lista de ids (textos) de ejercicios ya existentes.
- *       La respuesta devuelve la rutina actualizada, con esos mismos ids en exercises.
+ *       Cada ejercicio se envia como { exercise, sets, reps } y el orden de la lista es el orden de la rutina.
+ *       Solo un ADMIN puede cambiar el dueño con `owner`; si lo envia un usuario normal, se ignora.
  *       La puede modificar un ADMIN (cualquier rutina) o el usuario dueño de la rutina (solo las suyas).
  *     parameters:
  *       - in: path
@@ -231,7 +235,7 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  *       required: true
  *       content:
  *         application/json:
- *           schema: { $ref: '#/components/schemas/WorkoutInput' }
+ *           schema: { $ref: '#/components/schemas/WorkoutAdminInput' }
  *     responses:
  *       200:
  *         description: Rutina actualizada. Al actualizar, los ejercicios se devuelven como ids, no como objetos.
@@ -249,7 +253,7 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
 // Ruta para actualizar una rutina
 // ADMIN (cualquier rutina) o el dueño de la rutina (solo las suyas)
 // Primero comprobamos que el ID sea correcto, despues quien es el dueño y por ultimo validamos los datos recibidos
-router.put('/:workoutId', ValidateId('workoutId'), RequireOwnerOrAdmin, ValidateJoi(Schemas.workout.update), controller.updateWorkout);
+router.put('/:workoutId', ValidateId('workoutId'), RequireOwnerOrAdmin, ValidateJoi(Schemas.workout.adminUpdate), controller.updateWorkout);
 
 // Exportamos el router para poder utilizar estas rutas en la aplicacion
 /**

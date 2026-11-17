@@ -91,6 +91,35 @@ const workoutExercise = Joi.object({
 // Lista de ejercicios de una rutina; el orden del array es el orden de la rutina
 const workoutExercises = Joi.array().items(workoutExercise).example([{ exercise: '6ab2d1ad9ada2730451295a7', sets: 4, reps: 10 }]);
 
+// Dueño de una rutina: id de un usuario
+const workoutOwner = Joi.string().pattern(OBJECT_ID).example('6ab2d1ad9ada2730451295a7');
+
+// Esquema para crear una rutina
+const workoutCreate = Joi.object({
+    // El nombre es obligatorio
+    name: Joi.string().trim().required().example('Pierna'),
+
+    // La descripcion es opcional y puede ser un string vacio
+    description: Joi.string().allow('').optional().example('Rutina de pierna'),
+
+    // Los dias son opcionales (pueden ser una lista vacia), sin repetidos
+    days: Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)).unique().example(['MONDAY', 'THURSDAY']),
+
+    // Los ejercicios son opcionales. El orden de la lista es el orden de la rutina
+    exercises: workoutExercises
+});
+
+// Esquema para actualizar una rutina
+const workoutUpdate = Joi.object({
+    // El nombre es obligatorio tambien al actualizar
+    name: Joi.string().trim().required(),
+
+    // El resto de campos son opcionales
+    description: Joi.string().allow('').optional(),
+    days: Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)).unique(),
+    exercises: workoutExercises
+});
+
 // Aqui tenemos todos los esquemas de validacion que utilizamos en la aplicacion
 export const Schemas = {
     // Borrado multiple (lo usan las tres entidades)
@@ -107,6 +136,8 @@ export const Schemas = {
             ...listQuery,
             // Rutinas que incluyen este dia de la semana
             day: Joi.string().valid(...DAYS_OF_WEEK),
+            // Solo las rutinas de este usuario (id del dueño)
+            owner: Joi.string().pattern(OBJECT_ID),
             // Columnas por las que se pueden ordenar las rutinas
             ...sortQuery(['name', 'description'])
         }),
@@ -166,32 +197,15 @@ export const Schemas = {
 
     // Validaciones relacionadas con las rutinas (las usan tanto el ADMIN como el propio usuario)
     workout: {
-        // Esquema que se utiliza cuando queremos crear una rutina.
-        // El dueño no se envia: es el usuario del token
-        create: Joi.object({
-            // El nombre es obligatorio
-            name: Joi.string().trim().required().example('Pierna'),
-
-            // La descripcion es opcional y puede ser un string vacio
-            description: Joi.string().allow('').optional().example('Rutina de pierna'),
-
-            // Los dias son opcionales (pueden ser una lista vacia), sin repetidos
-            days: Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)).unique().example(['MONDAY', 'THURSDAY']),
-
-            // Los ejercicios son opcionales. El orden de la lista es el orden de la rutina
-            exercises: workoutExercises
-        }),
+        // Esquema que se utiliza cuando el usuario crea una rutina. El dueño no se envia: es el usuario del token
+        create: workoutCreate,
 
         // Esquema que se utiliza para actualizar una rutina (nombre, ejercicios, orden, series, repeticiones y dias)
-        update: Joi.object({
-            // El nombre es obligatorio tambien al actualizar
-            name: Joi.string().trim().required(),
+        update: workoutUpdate,
 
-            // El resto de campos son opcionales
-            description: Joi.string().allow('').optional(),
-            days: Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)).unique(),
-            exercises: workoutExercises
-        })
+        // Igual que los anteriores, pero el ADMIN tambien puede indicar el dueño (owner) de la rutina
+        adminCreate: workoutCreate.keys({ owner: workoutOwner }),
+        adminUpdate: workoutUpdate.keys({ owner: workoutOwner })
     },
 
     // Validaciones relacionadas con los entrenamientos realizados
