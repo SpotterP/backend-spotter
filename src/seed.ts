@@ -46,19 +46,26 @@ const seed = async () => {
     const createdExercises = await Exercise.create(exercisesSeed);
     Logging.info(`Ejercicios creados: ${createdExercises.length}`);
 
+    // Las rutinas del seed son del usuario normal (el USER del seed)
+    const owner = createdUsers.find((user) => user.role === 'USER');
+
+    if (!owner) {
+        throw new Error('En seed-data.ts tiene que haber un usuario con rol USER para ser el dueño de las rutinas');
+    }
+
     // Cada rutina trae los nombres de sus ejercicios; aquí se cambian por los ids que les ha dado MongoDB
-    const workoutsWithExercises = workoutsSeed.map(({ exerciseNames, ...workout }) => {
-        const exercises = exerciseNames.map((name) => {
+    const workoutsWithExercises = workoutsSeed.map(({ exerciseItems, ...workout }) => {
+        const exercises = exerciseItems.map(({ name, sets, reps }) => {
             const exercise = createdExercises.find((created) => created.name === name);
 
             if (!exercise) {
                 throw new Error(`En seed-data.ts hay una rutina con un ejercicio que no existe: ${name}`);
             }
 
-            return exercise._id;
+            return { exercise: exercise._id, sets, reps };
         });
 
-        return { ...workout, exercises };
+        return { ...workout, owner: owner._id, exercises };
     });
 
     const createdWorkouts = await Workout.insertMany(workoutsWithExercises);

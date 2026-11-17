@@ -58,12 +58,13 @@ const router = express.Router();
  *         description: Texto que debe contener el nombre o la descripción (sin distinguir mayúsculas)
  *         schema: { type: string }
  *       - in: query
- *         name: dayOfWeek
+ *         name: day
+ *         description: Solo las rutinas que incluyen este día
  *         schema: { type: string, enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY] }
  *       - in: query
  *         name: sort
  *         description: Columna por la que se ordena (por defecto name)
- *         schema: { type: string, enum: [name, description, dayOfWeek] }
+ *         schema: { type: string, enum: [name, description] }
  *       - in: query
  *         name: order
  *         description: Sentido del orden (por defecto asc)

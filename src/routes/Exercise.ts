@@ -55,7 +55,7 @@ const router = express.Router();
  *       - in: query
  *         name: sort
  *         description: Columna por la que se ordena (por defecto name)
- *         schema: { type: string, enum: [name, category, sets, reps] }
+ *         schema: { type: string, enum: [name, category] }
  *       - in: query
  *         name: order
  *         description: Sentido del orden (por defecto asc)
