@@ -173,6 +173,36 @@ router.delete('/hard', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), co
 
 /**
  * @openapi
+ * /users/me:
+ *   get:
+ *     tags: [Users]
+ *     summary: Devuelve mi perfil
+ *     description: >
+ *       Devuelve el id, el nombre y el email del usuario de la sesión. El usuario sale del token,
+ *       así que cada uno solo ve el suyo. Lo puede usar cualquier usuario con token.
+ *     responses:
+ *       200:
+ *         description: Mi perfil
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     _id: { type: string, example: 6ab3f2fe9c500204a7d5f8a1 }
+ *                     name: { type: string, example: Marta }
+ *                     email: { type: string, example: marta@example.com }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+
+// Perfil del usuario de la sesion. Tiene que ir ANTES de /:userId, porque si no "me" se tomaria como un id
+router.get('/me', controller.readMe);
+
+/**
+ * @openapi
  * /users/{userId}:
  *   get:
  *     tags: [Users]
