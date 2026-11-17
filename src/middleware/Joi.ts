@@ -110,6 +110,11 @@ export const Schemas = {
             // Columnas por las que se pueden ordenar las rutinas
             ...sortQuery(['name', 'description'])
         }),
+        // Los entrenamientos solo tienen pagina y limite
+        session: Joi.object({
+            page: listQuery.page,
+            limit: listQuery.limit
+        }),
         user: Joi.object({
             ...listQuery,
             // Los usuarios solo se pueden ordenar por nombre
@@ -186,6 +191,29 @@ export const Schemas = {
             description: Joi.string().allow('').optional(),
             days: Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)).unique(),
             exercises: workoutExercises
+        })
+    },
+
+    // Validaciones relacionadas con los entrenamientos realizados
+    session: {
+        // Esquema que se utiliza para guardar un entrenamiento terminado. El usuario es el del token
+        create: Joi.object({
+            // La rutina es opcional: no se envia si el entrenamiento empezo de cero
+            workout: Joi.string().pattern(OBJECT_ID).example('6ab2d1ad9ada2730451295a7'),
+
+            // Fechas de inicio y fin. El fin no puede ser antes que el inicio
+            startedAt: Joi.date().iso().required().example('2026-11-17T18:00:00.000Z'),
+            finishedAt: Joi.date().iso().min(Joi.ref('startedAt')).required().example('2026-11-17T19:05:00.000Z'),
+
+            // Ejercicios hechos, cada uno con sus series (repeticiones y peso en kg)
+            exercises: Joi.array().items(
+                Joi.object({
+                    exercise: Joi.string().pattern(OBJECT_ID).required().example('6ab2d1ad9ada2730451295a7'),
+                    sets: Joi.array()
+                        .items(Joi.object({ reps: Joi.number().integer().min(1).required().example(10), weight: Joi.number().min(0).required().example(60) }))
+                        .required()
+                })
+            )
         })
     },
 

@@ -15,6 +15,7 @@ const { swagger: refreshInput } = j2s(Schemas.auth.refresh);
 const { swagger: userInput } = j2s(Schemas.user.create);
 const { swagger: exerciseInput } = j2s(Schemas.exercise.create);
 const { swagger: workoutInput } = j2s(Schemas.workout.create);
+const { swagger: sessionInput } = j2s(Schemas.session.create);
 
 // Lo que devuelve la API no es igual a lo que se envía: lleva el _id, las fechas que
 // pone MongoDB y las marcas del borrado lógico, que no se envían nunca en el body.
@@ -54,6 +55,29 @@ const populatedWorkoutSchema = {
                     exercise: exerciseSchema,
                     sets: { type: 'integer', example: 4 },
                     reps: { type: 'integer', example: 10 }
+                }
+            }
+        }
+    }
+};
+
+// Un entrenamiento guardado lleva el usuario, la rutina (si la hay) y las fechas. Al leerlo,
+// cada ejercicio sale entero (populate) con sus series.
+const sessionSchema = {
+    type: 'object',
+    properties: {
+        _id: storedFields._id,
+        createdAt: storedFields.createdAt,
+        updatedAt: storedFields.updatedAt,
+        user: { type: 'string', example: '6ab3f2fe9c500204a7d5f8a2' },
+        ...sessionInput.properties,
+        exercises: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    exercise: exerciseSchema,
+                    sets: { type: 'array', items: { type: 'object', properties: { reps: { type: 'integer', example: 10 }, weight: { type: 'number', example: 60 } } } }
                 }
             }
         }
@@ -134,6 +158,7 @@ const swaggerDocument = swaggerJsdoc({
             { name: 'Exercises', description: 'Ejercicios del gimnasio' },
             { name: 'Workouts', description: 'Rutinas, con los ejercicios que las forman' },
             { name: 'Users', description: 'Usuarios del backoffice' },
+            { name: 'My sessions', description: 'Entrenamientos realizados por el propio usuario' },
             { name: 'My workouts', description: 'Rutinas del propio usuario: crea, ve y toca solo las suyas' }
         ],
         // Por defecto todas las rutas piden el token (el candado de Swagger).
@@ -155,7 +180,9 @@ const swaggerDocument = swaggerJsdoc({
                 Exercise: exerciseSchema,
                 WorkoutInput: workoutInput,
                 Workout: workoutSchema,
-                WorkoutPopulated: populatedWorkoutSchema
+                WorkoutPopulated: populatedWorkoutSchema,
+                SessionInput: sessionInput,
+                Session: sessionSchema
             },
             responses: {
                 LoginOk: okResponse(
