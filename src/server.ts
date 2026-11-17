@@ -10,6 +10,7 @@ import { VerifyToken } from './middleware/VerifyToken';
 import authRoutes from './routes/Auth';
 import exerciseRoutes from './routes/Exercise';
 import workoutRoutes from './routes/Workout';
+import myWorkoutRoutes from './routes/MyWorkouts';
 import swaggerUi from 'swagger-ui-express'; // permite mostrar Swagger en el navegador.
 import swaggerDocument from './config/swagger'; // importa el documento que hemos creado en swagger.ts
 const router = express();
@@ -47,6 +48,8 @@ const StartServer = () => {
     // La lista de usuarios (solo id y nombre) la puede consultar cualquier usuario autenticado.
     // Las escrituras (POST y PUT) y el detalle por id son solo para ADMIN, y eso se comprueba
     // en src/routes/Users.ts, porque aquí el montaje es el mismo para todas las rutas del router.
+    // Las rutinas del propio usuario van ANTES que /users: asi "me" no se confunde con un :userId.
+    router.use('/users/me/workouts', VerifyToken, myWorkoutRoutes);
     router.use('/users', VerifyToken, userRoutes);
 
     // La documentacion y el healthcheck son publicos

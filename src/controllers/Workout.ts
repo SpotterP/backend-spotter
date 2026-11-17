@@ -5,7 +5,8 @@ import WorkoutService from '../services/WorkoutService';
 // Cogemos los datos que nos llegan en el body y se los pasamos al servicio
 const createWorkout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const workout = await WorkoutService.createWorkout(req.body);
+        // La rutina creada desde el backoffice es del ADMIN que la crea
+        const workout = await WorkoutService.createWorkout(req.body, req.user!.id);
 
         // Si se ha creado correctamente devolvemos la rutina creada
         // El codigo 201 indica que se ha creado un recurso nuevo

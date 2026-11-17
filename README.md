@@ -98,10 +98,13 @@ y `POST /auth/refresh` responden 401 con sus credenciales, como si no existiera.
 
 Los cuerpos que se envían:
 
-- **Ejercicios**: `name`, `category` (una de `CHEST`, `BACK`, `LEGS`, `SHOULDERS`, `ARMS`, `CORE`, `CARDIO`),
-  `sets` y `reps` (enteros, opcionales).
-- **Rutinas**: `name`, `description` (opcional), `dayOfWeek` (de `MONDAY` a `SUNDAY`) y `exercises`, que se
-  envía como lista de ids de ejercicio y se devuelve como lista de objetos `Exercise` completos al leer por id.
+- **Ejercicios** (catálogo): `name` y `category` (una de `CHEST`, `BACK`, `LEGS`, `SHOULDERS`, `ARMS`, `CORE`, `CARDIO`).
+- **Rutinas**: `name`, `description` (opcional), `days` (lista de `MONDAY` a `SUNDAY`, puede estar vacía) y
+  `exercises`, una lista de `{ exercise, sets, reps }`: el id del ejercicio del catálogo y sus series y repeticiones
+  en esa rutina. El orden de la lista es el orden de la rutina, y al leer cada `exercise` sale como objeto completo.
+  Cada rutina tiene un dueño (`owner`) y el nombre es único por usuario.
+- **Mis rutinas** (rol USER): `GET` y `POST /users/me/workouts`, y `GET`, `PUT` y `DELETE`
+  `/users/me/workouts/:workoutId`. Cada usuario solo ve y toca las suyas; una rutina de otro responde 404.
 - **Usuarios**: `name`, `email`, `password` (8 caracteres como mínimo) y `role` (`ADMIN` o `USER`).
 
 ## Estructura del proyecto

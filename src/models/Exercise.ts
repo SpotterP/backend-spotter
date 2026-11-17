@@ -11,10 +11,6 @@ export interface IExercise {
 
     category: ExerciseCategory;
 
-    sets: number;
-
-    reps: number;
-
     // Marca si el ejercicio esta borrado. Los ejercicios borrados no se eliminan fisicamente de la base de datos
     isDeleted: boolean;
 
@@ -34,11 +30,6 @@ const ExerciseSchema: Schema = new Schema(
 
         // La categoria es obligatoria y solo puede ser una de las definidas arriba
         category: { type: String, enum: EXERCISE_CATEGORIES, required: true },
-
-        // Por defecto un ejercicio no tiene series ni repeticiones asignadas
-        sets: { type: Number, default: 0 },
-
-        reps: { type: Number, default: 0 },
 
         isDeleted: { type: Boolean, default: false },
 

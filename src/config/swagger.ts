@@ -34,13 +34,30 @@ const userSchema = { type: 'object', properties: { ...storedFields, ...userField
 
 const exerciseSchema = { type: 'object', properties: { ...storedFields, ...exerciseInput.properties } };
 
-// Una rutina guardada lleva los ejercicios como ids, porque así se envían y así se guardan.
-const workoutSchema = { type: 'object', properties: { ...storedFields, ...workoutInput.properties } };
+// Una rutina guardada lleva el dueño (owner) y cada ejercicio como { exercise: id, sets, reps }.
+const workoutSchema = {
+    type: 'object',
+    properties: { ...storedFields, owner: { type: 'string', example: '6ab3f2fe9c500204a7d5f8a2' }, ...workoutInput.properties }
+};
 
-// Al leer una rutina por su id, el servicio hace populate y devuelve los ejercicios enteros.
+// Al leer una rutina el servicio hace populate y devuelve cada ejercicio del catálogo entero,
+// junto con las series y repeticiones de esa rutina.
 const populatedWorkoutSchema = {
     type: 'object',
-    properties: { ...storedFields, ...workoutInput.properties, exercises: { type: 'array', items: exerciseSchema } }
+    properties: {
+        ...workoutSchema.properties,
+        exercises: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    exercise: exerciseSchema,
+                    sets: { type: 'integer', example: 4 },
+                    reps: { type: 'integer', example: 10 }
+                }
+            }
+        }
+    }
 };
 
 // Ejemplos que se ven en la página de Swagger, con datos del dominio del gimnasio
@@ -48,8 +65,6 @@ const exerciseExample = {
     _id: '6ab3f2fe9c500204a7d5f8b1',
     name: 'Press de banca',
     category: 'CHEST',
-    sets: 4,
-    reps: 10,
     createdAt: '2026-09-23T10:00:00.000Z',
     updatedAt: '2026-09-23T10:00:00.000Z',
     isDeleted: false,
@@ -60,15 +75,16 @@ const workoutExample = {
     _id: '6ab3f2fe9c500204a7d5f8c1',
     name: 'Día de pecho',
     description: 'Press de banca y aperturas para terminar.',
-    dayOfWeek: 'MONDAY',
-    exercises: [exerciseExample._id],
+    owner: '6ab3f2fe9c500204a7d5f8a2',
+    days: ['MONDAY', 'THURSDAY'],
+    exercises: [{ exercise: exerciseExample._id, sets: 4, reps: 10 }],
     createdAt: '2026-09-23T10:00:00.000Z',
     updatedAt: '2026-09-23T10:00:00.000Z',
     isDeleted: false,
     deletedAt: null
 };
 
-const populatedWorkoutExample = { ...workoutExample, exercises: [exerciseExample] };
+const populatedWorkoutExample = { ...workoutExample, exercises: [{ exercise: exerciseExample, sets: 4, reps: 10 }] };
 
 // Una respuesta correcta: el esquema de lo que se devuelve y un ejemplo con datos de verdad
 const okResponse = (description: string, schema: object, example: object) => ({
@@ -117,7 +133,8 @@ const swaggerDocument = swaggerJsdoc({
             { name: 'Auth', description: 'Registro, login y renovación del token' },
             { name: 'Exercises', description: 'Ejercicios del gimnasio' },
             { name: 'Workouts', description: 'Rutinas, con los ejercicios que las forman' },
-            { name: 'Users', description: 'Usuarios del backoffice' }
+            { name: 'Users', description: 'Usuarios del backoffice' },
+            { name: 'My workouts', description: 'Rutinas del propio usuario: crea, ve y toca solo las suyas' }
         ],
         // Por defecto todas las rutas piden el token (el candado de Swagger).
         // Las rutas públicas lo quitan con security: [] en su comentario @openapi.
@@ -137,7 +154,8 @@ const swaggerDocument = swaggerJsdoc({
                 ExerciseInput: exerciseInput,
                 Exercise: exerciseSchema,
                 WorkoutInput: workoutInput,
-                Workout: workoutSchema
+                Workout: workoutSchema,
+                WorkoutPopulated: populatedWorkoutSchema
             },
             responses: {
                 LoginOk: okResponse(
