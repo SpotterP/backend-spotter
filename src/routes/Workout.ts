@@ -3,6 +3,7 @@ import express from 'express';
 import controller from '../controllers/Workout';
 
 import { Schemas, ValidateId, ValidateJoi, ValidateQuery } from '../middleware/Joi';
+import { RequireOwnerOrAdmin } from '../middleware/RequireOwnerOrAdmin';
 import { RequireRole } from '../middleware/RequireRole';
 
 // Creamos el router que se encargara de las rutas relacionadas con las rutinas
@@ -220,7 +221,7 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  *       Hay que enviar la rutina entera, no solo los campos que cambian.
  *       Los ejercicios se envian como una lista de ids (textos) de ejercicios ya existentes.
  *       La respuesta devuelve la rutina actualizada, con esos mismos ids en exercises.
- *       Solo un ADMIN puede modificarla.
+ *       La puede modificar un ADMIN (cualquier rutina) o el usuario dueño de la rutina (solo las suyas).
  *     parameters:
  *       - in: path
  *         name: workoutId
@@ -246,9 +247,9 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  */
 
 // Ruta para actualizar una rutina
-// Solo ADMIN, igual que la creacion: el catalogo lo mantiene el backoffice
-// Primero comprobamos que el ID sea correcto y despues validamos los datos recibidos
-router.put('/:workoutId', RequireRole('ADMIN'), ValidateId('workoutId'), ValidateJoi(Schemas.workout.update), controller.updateWorkout);
+// ADMIN (cualquier rutina) o el dueño de la rutina (solo las suyas)
+// Primero comprobamos que el ID sea correcto, despues quien es el dueño y por ultimo validamos los datos recibidos
+router.put('/:workoutId', ValidateId('workoutId'), RequireOwnerOrAdmin, ValidateJoi(Schemas.workout.update), controller.updateWorkout);
 
 // Exportamos el router para poder utilizar estas rutas en la aplicacion
 /**
@@ -259,7 +260,7 @@ router.put('/:workoutId', RequireRole('ADMIN'), ValidateId('workoutId'), Validat
  *     summary: Borrado lógico de una rutina
  *     description: >
  *       Marca la rutina como borrada (isDeleted). Sigue en la base de datos, pero deja de salir
- *       en los listados y su nombre queda libre. Solo ADMIN.
+ *       en los listados y su nombre queda libre. La puede borrar un ADMIN (cualquier rutina) o el usuario dueño (solo las suyas).
  *     parameters:
  *       - in: path
  *         name: workoutId
@@ -273,8 +274,8 @@ router.put('/:workoutId', RequireRole('ADMIN'), ValidateId('workoutId'), Validat
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 
-// Borrado logico: solo marca la rutina como borrada
-router.delete('/:workoutId', RequireRole('ADMIN'), ValidateId('workoutId'), controller.softDeleteWorkout);
+// Borrado logico: solo marca la rutina como borrada. ADMIN o el dueño de la rutina
+router.delete('/:workoutId', ValidateId('workoutId'), RequireOwnerOrAdmin, controller.softDeleteWorkout);
 
 /**
  * @openapi
