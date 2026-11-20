@@ -159,6 +159,7 @@ const swaggerDocument = swaggerJsdoc({
             { name: 'Exercises', description: 'Ejercicios del gimnasio' },
             { name: 'Workouts', description: 'Rutinas, con los ejercicios que las forman' },
             { name: 'Users', description: 'Usuarios del backoffice' },
+            { name: 'My progress', description: 'Progreso del propio usuario: entrenamientos, días y ejercicios' },
             { name: 'My sessions', description: 'Entrenamientos realizados por el propio usuario' },
             { name: 'My workouts', description: 'Rutinas del propio usuario: crea, ve y toca solo las suyas' }
         ],
