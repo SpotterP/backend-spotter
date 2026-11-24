@@ -116,15 +116,14 @@ export const updateUser = (userId: string, data: UpdateUserInput): Promise<Hydra
 // (sort es la columna por la que ordenar y order el sentido: asc o desc)
 export type ListUsersInput = { page: number; limit: number; search?: string; sort?: string; order?: 'asc' | 'desc' };
 
-// Devuelve una pagina de usuarios: solo _id y name.
-// El buscador mira SOLO el nombre: este listado lo puede llamar cualquier usuario con sesion
-// y no debe permitir descubrir emails de otros (por eso tampoco hay filtro por rol).
-// El ADMIN ve todos los usuarios, tambien los borrados logicamente; cualquier otra sesion
-// solo ve los activos.
-export const listUsers = async ({ page, limit, search, sort, order }: ListUsersInput, isAdmin: boolean) => {
+// Devuelve una pagina de usuarios: solo _id, name e isDeleted.
+// Solo lo llama un ADMIN, asi que el filtro no esconde los usuarios borrados logicamente.
+// El buscador mira SOLO el nombre y la proyeccion no lleva el email, asi que este listado
+// no permite descubrir emails de otros (por eso tampoco hay filtro por rol).
+export const listUsers = async ({ page, limit, search, sort, order }: ListUsersInput) => {
 
-    // El ADMIN consulta todo, asi que su filtro empieza vacio; el resto empieza solo con los activos
-    const filter: Record<string, unknown> = isAdmin ? {} : { isDeleted: false };
+    // El ADMIN ve tambien los usuarios borrados, asi que el filtro empieza vacio
+    const filter: Record<string, unknown> = {};
 
     // Buscador: el nombre contiene el texto, sin distinguir mayusculas
     if (search) {
@@ -134,7 +133,7 @@ export const listUsers = async ({ page, limit, search, sort, order }: ListUsersI
     // El nombre no es unico, asi que desempatamos con _id para que el orden sea estable entre paginas
     const [users, total] = await Promise.all([
         // Ordenamos por la columna pedida (por defecto el nombre)
-        User.find(filter).select(isAdmin ? '_id name isDeleted' : '_id name').sort(buildSort(sort, order, 'name')).skip(getSkip(page, limit)).limit(limit).lean(),
+        User.find(filter).select('_id name isDeleted').sort(buildSort(sort, order, 'name')).skip(getSkip(page, limit)).limit(limit).lean(),
         User.countDocuments(filter)
     ]);
 

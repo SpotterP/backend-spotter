@@ -15,8 +15,8 @@ const router = express.Router();
  *     summary: Lista los usuarios
  *     description: >
  *       Devuelve solo el id y el nombre de cada usuario, con paginación y buscador por nombre.
- *       Cualquier usuario con token puede consultarla. Un ADMIN ve también los usuarios borrados;
- *       el resto solo ve los activos.
+ *       Solo ADMIN, que es el único que puede ver también los usuarios borrados lógicamente;
+ *       cualquier otro usuario recibe 403.
  *     parameters:
  *       - in: query
  *         name: page
@@ -61,12 +61,14 @@ const router = express.Router();
  *                     hasNextPage: { type: boolean }
  *                     hasPrevPage: { type: boolean }
  *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
  *       500: { $ref: '#/components/responses/ServerError' }
  */
 
-// Devuelve el listado de usuarios disponibles.
-router.get('/', ValidateQuery(Schemas.query.user), controller.listUsers);
+// Listado de usuarios. Solo ADMIN: el backoffice es quien lo consume, y el listado lleva
+// tambien los usuarios borrados logicamente, que un usuario normal no debe ver
+router.get('/', RequireRole('ADMIN'), ValidateQuery(Schemas.query.user), controller.listUsers);
 
 /**
  * @openapi

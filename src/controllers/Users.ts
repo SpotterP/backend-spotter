@@ -2,15 +2,12 @@ import { NextFunction, Request, Response } from 'express';
 import UserService from '../services/UserService';
 
 // Devuelve los datos básicos de los usuarios (id y nombre) con paginación y buscador,
-// para que el frontend pueda mostrarlos.
+// para que el backoffice pueda mostrarlos. Solo ADMIN (lo exige la ruta), así que la vista
+// incluye también los usuarios borrados lógicamente.
 const listUsers = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // El servicio necesita saber el rol de la sesion: el ADMIN ve todos los usuarios
-        // (tambien los borrados) y cualquier otra sesion solo los activos
-        const isAdmin = req.user?.role === 'ADMIN';
-
         // ValidateQuery ya ha comprobado y convertido los parametros de la URL
-        const result = await UserService.listUsers(res.locals.query, isAdmin);
+        const result = await UserService.listUsers(res.locals.query);
 
         // Devolvemos { users, pagination }
         res.status(200).json(result);
