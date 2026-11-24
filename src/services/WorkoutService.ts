@@ -1,6 +1,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import Workout, { DayOfWeek, IWorkout } from '../models/Workout';
 import { buildPageInfo, buildSort, escapeRegex, getSkip } from '../utils/pagination';
+import { assertExercisesExist, assertUserExists } from '../utils/references';
 
 // Un ejercicio de la rutina tal y como llega en el cuerpo de la peticion: el id del ejercicio
 // del catalogo (texto) y sus series y repeticiones.
@@ -11,7 +12,8 @@ export type WorkoutExerciseInput = { exercise: string; sets: number; reps: numbe
 export type NewWorkout = Pick<IWorkout, 'name'> & { description?: string; days?: DayOfWeek[]; exercises?: WorkoutExerciseInput[] };
 
 // Datos que se pueden actualizar de una rutina.
-export type UpdateWorkoutInput = Partial<Pick<IWorkout, 'name' | 'description' | 'days'>> & { exercises?: WorkoutExerciseInput[] };
+// El ADMIN tambien puede cambiar el dueño (owner, el id de otro usuario).
+export type UpdateWorkoutInput = Partial<Pick<IWorkout, 'name' | 'description' | 'days'>> & { exercises?: WorkoutExerciseInput[]; owner?: string };
 
 // Tipo de un documento de rutina ya cargado por Mongoose
 type WorkoutDocument = HydratedDocument<IWorkout>;
@@ -23,6 +25,10 @@ const toWorkoutExercises = (exercises: WorkoutExerciseInput[]) =>
 // Si el nombre ya existe entre las rutinas no borradas de ese usuario, MongoDB devuelve
 // el error 11000 (clave duplicada) por el indice unico parcial del modelo.
 export const createWorkout = async (data: NewWorkout, ownerId: string): Promise<WorkoutDocument> => {
+
+    // El dueño y los ejercicios tienen que existir; si no, 404
+    await assertUserExists(ownerId);
+    await assertExercisesExist((data.exercises ?? []).map(({ exercise }) => exercise));
 
     const workout = new Workout({
         ...data,
@@ -88,6 +94,12 @@ export const hardDeleteWorkout = (workoutId: string): Promise<WorkoutDocument | 
 // Funcion que se encarga de actualizar una rutina.
 // Si se pasa ownerId, solo se actualiza si la rutina es de ese usuario (si no, devuelve null y el controlador responde 404).
 export const updateWorkout = async (workoutId: string, data: UpdateWorkoutInput, ownerId?: string): Promise<WorkoutDocument | null> => {
+
+    // Los ejercicios y el nuevo dueño (si se envia) tienen que existir; si no, 404
+    await assertExercisesExist((data.exercises ?? []).map(({ exercise }) => exercise));
+    if (data.owner) {
+        await assertUserExists(data.owner);
+    }
 
     // Copiamos los datos recibidos y convertimos los ejercicios a ObjectId
     const updates: Record<string, unknown> = { ...data };

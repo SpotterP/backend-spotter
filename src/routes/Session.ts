@@ -19,7 +19,7 @@ router.use(RequireRole('USER'));
  *     summary: Guarda un entrenamiento terminado
  *     description: >
  *       La app lo envía entero al pulsar finalizar. El usuario es el de la sesión. `workout` es
- *       opcional: se omite si el entrenamiento se empezó de cero. Cada ejercicio lleva las series
+ *       opcional: se omite si el entrenamiento se empezó de cero; si se envía, tiene que ser una rutina mía. Si la rutina o algún ejercicio no existe, responde 404. Cada ejercicio lleva las series
  *       que se han hecho, con sus repeticiones y su peso en kg.
  *     requestBody:
  *       required: true
@@ -37,6 +37,7 @@ router.use(RequireRole('USER'));
  *                 session: { $ref: '#/components/schemas/Session' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
  */
 router.post('/', ValidateJoi(Schemas.session.create), controller.createSession);

@@ -43,7 +43,7 @@ router.get('/', controller.listMyWorkouts);
  *     description: >
  *       El dueño es el usuario de la sesión. El orden de `exercises` es el orden de la rutina y cada
  *       ejercicio lleva sus propias series y repeticiones. `days` puede estar vacío. El nombre no
- *       puede repetirse entre mis rutinas activas (otro usuario sí puede usarlo).
+ *       puede repetirse entre mis rutinas activas (otro usuario sí puede usarlo). Si algún ejercicio no existe, responde 404.
  *     requestBody:
  *       required: true
  *       content:
@@ -53,6 +53,7 @@ router.get('/', controller.listMyWorkouts);
  *       201: { $ref: '#/components/responses/WorkoutOne' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
  */
