@@ -11,6 +11,11 @@ import { IUser, USER_ROLES } from '../models/User';
 export const ValidateJoi = (schema: ObjectSchema) => {
     return async (req: Request, res: Response, next: NextFunction) => {
         try {
+            // Si la peticion no trae body (o trae un tipo que Express no lee, como texto plano),
+            // req.body llega como undefined. Lo tratamos como un objeto vacio: asi Joi responde 422 diciendo
+            // que campos faltan, en vez de que el controlador falle al leer req.body.email (500)
+            req.body = req.body ?? {};
+
             // Comprobamos que los datos del body cumplen el esquema
             await schema.validateAsync(req.body);
 
