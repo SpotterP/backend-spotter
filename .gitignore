@@ -6,8 +6,6 @@ build/
 
 # Variables de entorno: cada uno tiene su propio .env, copiado de .env.example
 .env
-# Variables de la pila de producción (docker-compose.yml): copiadas de .env.production.example
-.env.production
 
 # Logs y cachés
 npm-debug.log*
