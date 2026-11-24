@@ -46,6 +46,12 @@ Y para aplicar las correcciones automáticas que tenga:
 npm run lint:fix
 ```
 
+### Hook de Git: linter antes de cada commit
+
+Al hacer `npm install` se activa solo un hook de Git (`.githooks/pre-commit`, lo configura el script `prepare`).
+Antes de cada `git commit` pasa `npm run lint`: si el linter encuentra un error, el commit se cancela y dice qué arreglar.
+Si hace falta, se puede saltar una vez con `git commit --no-verify`, pero lo normal es arreglar el aviso.
+
 ## Endpoints
 
 Todo salvo `/auth/*`, `/ping` y `/api-docs` pide el token en la cabecera `Authorization: Bearer <token>`.
