@@ -92,7 +92,12 @@ La app Flutter apunta a la API con `--dart-define`: `flutter run --dart-define=A
 
 ### Probarlo sin dominio
 Con `DOMAIN=localhost` y `API_DOMAIN=api.localhost` Caddy genera certificados locales, así se puede comprobar el HTTPS en un ordenador sin dominio (el navegador avisará de que el certificado no es de confianza).
-Es lo que hace la prueba automática de GitHub Actions (`.github/workflows/https-stack.yml`) en cada PR que toca la pila: levanta todo, y comprueba la web, la redirección a https, la API con su CORS, el login y el Socket.IO.
+La prueba automática de GitHub Actions (`.github/workflows/https-stack.yml`) hace dos comprobaciones en cada PR que toca la pila:
+
+1. **La pila con HTTPS local:** levanta todo con `localhost` y `api.localhost`, y comprueba la web, la redirección a https, la API con su CORS, el login y el Socket.IO.
+2. **Los certificados por ACME:** levanta la pila con los nombres `spotter.test` y `api.spotter.test` y con Pebble, el servidor de pruebas de Let's Encrypt, y comprueba que Caddy pide y recibe un certificado por cada dominio con el mismo `Caddyfile` de producción.
+
+Lo único que no se puede probar sin un servidor es el Let's Encrypt real: el DNS apuntando al servidor y los puertos 80 y 443 abiertos.
 
 ## Endpoints
 
