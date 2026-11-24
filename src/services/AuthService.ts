@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { HydratedDocument } from 'mongoose';
 import { config } from '../config/config';
 import User, { IUser, IUserModel } from '../models/User';
 import type { AccessTokenPayload, RefreshTokenPayload } from '../types/auth';
@@ -7,17 +8,19 @@ import { verifyPassword } from '../utils/password';
 // Firma el access token: el que se envia en cada peticion en la cabecera Authorization.
 // Dura poco (JWT_EXPIRES_IN, 15 minutos por defecto) para que, si alguien lo roba, le sirva poco tiempo.
 // jwt.sign añade solo el claim exp a partir de expiresIn.
+// Lleva la version de tokens del usuario: al cerrar sesion sube esa version y este token deja
+// de valer en la siguiente peticion, sin esperar a que caduque.
 export const signAccessToken = (user: IUserModel) => {
-    const payload: AccessTokenPayload = { sub: String(user._id), role: user.role };
+    const payload: AccessTokenPayload = { sub: String(user._id), role: user.role, tokenVersion: user.tokenVersion ?? 0 };
 
     return jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
 };
 
 // Firma el refresh token: solo sirve para pedir un access token nuevo en POST /auth/refresh.
 // Dura mas (JWT_REFRESH_EXPIRES_IN, 7 dias por defecto) y se firma con otro secreto, asi que
-// no se puede usar como access token.
+// no se puede usar como access token. Tambien lleva la version de tokens: cerrar sesion lo corta.
 export const signRefreshToken = (user: IUserModel) => {
-    const payload: RefreshTokenPayload = { sub: String(user._id) };
+    const payload: RefreshTokenPayload = { sub: String(user._id), tokenVersion: user.tokenVersion ?? 0 };
 
     return jwt.sign(payload, config.jwt.refreshSecret, { expiresIn: config.jwt.refreshExpiresIn });
 };
@@ -73,6 +76,7 @@ export const adminLogin = async (email: string, password: string) => {
 // Recibe un refresh token y, si es valido, devuelve un access token nuevo.
 // Si el token esta caducado o mal firmado, jwt.verify lanza un error y el ErrorHandler responde 401.
 // Si el usuario ya no existe, o esta borrado logicamente, devuelve null y el controlador responde 401.
+// Si el usuario cerro sesion despues de firmarlo, devuelve 'REVOKED' y tambien responde 401.
 export const refresh = async (refreshToken: string) => {
     const payload = jwt.verify(refreshToken, config.jwt.refreshSecret) as RefreshTokenPayload;
 
@@ -84,7 +88,22 @@ export const refresh = async (refreshToken: string) => {
         return null;
     }
 
+    // La version del token tiene que ser la del usuario: si cerro sesion, ya no lo es.
+    // Los tokens firmados antes de existir este campo no lo llevan y cuentan como version 0.
+    if ((payload.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+        return 'REVOKED' as const;
+    }
+
     return { token: signAccessToken(user) };
 };
 
-export default { register, login, adminLogin, refresh };
+// Cierra la sesion del usuario: sube su version de tokens, asi el access token y el refresh token
+// que ya existian dejan de valer en la siguiente peticion. Eso incluye los de otros dispositivos:
+// cerrar sesion en uno cierra la sesion en todos. Devuelve null si el usuario ya no existe.
+export const logout = (userId: string): Promise<HydratedDocument<IUserModel> | null> => {
+
+    return User.findOneAndUpdate({ _id: userId, isDeleted: false }, { $inc: { tokenVersion: 1 } }, { new: true });
+
+};
+
+export default { register, login, adminLogin, refresh, logout };

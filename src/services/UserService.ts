@@ -42,17 +42,19 @@ export const getMe = (userId: string): Promise<HydratedDocument<IUserModel> | nu
 
 // Borrado logico: el usuario sigue en la base de datos, pero marcado como borrado.
 // Deja de salir en los listados y su email queda libre (indice unico parcial del modelo).
+// Subimos tambien la version de tokens: asi los tokens que tuviera dejan de servir para siempre,
+// tambien si despues se recupera la cuenta. Al recuperarla hay que volver a iniciar sesion.
 // Devuelve null si no existe o ya estaba borrado.
 export const softDeleteUser = (userId: string): Promise<HydratedDocument<IUserModel> | null> => {
 
-    return User.findOneAndUpdate({ _id: userId, isDeleted: false }, { isDeleted: true, deletedAt: new Date() }, { new: true });
+    return User.findOneAndUpdate({ _id: userId, isDeleted: false }, { isDeleted: true, deletedAt: new Date(), $inc: { tokenVersion: 1 } }, { new: true });
 
 };
 
 // Borrado logico de varios usuarios a la vez. Devuelve cuantos se han borrado.
 export const softDeleteManyUsers = async (ids: string[]): Promise<number> => {
 
-    const result = await User.updateMany({ _id: { $in: ids }, isDeleted: false }, { isDeleted: true, deletedAt: new Date() });
+    const result = await User.updateMany({ _id: { $in: ids }, isDeleted: false }, { isDeleted: true, deletedAt: new Date(), $inc: { tokenVersion: 1 } });
 
     return result.modifiedCount;
 
@@ -94,6 +96,14 @@ export const updateUser = (userId: string, data: UpdateUserInput): Promise<Hydra
         // Usamos save() en lugar de update para que el hook pre('save')
         // vuelva a cifrar la contraseña si ha cambiado.
         Object.assign(user, data);
+
+        // Si el cambio trae contraseña, cerramos las sesiones que tuviera abiertas: subimos la
+        // version de tokens y sus access y refresh tokens dejan de valer. Cambiar solo el nombre
+        // o el email no cierra nada. Si quien cambia la contraseña es un ADMIN sobre otro usuario,
+        // las sesiones que se cierran son las del afectado, no las del admin.
+        if (data.password !== undefined) {
+            user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+        }
 
         // Guardamos los cambios en la base de datos
         return user.save();

@@ -18,6 +18,11 @@ export interface IUser {
     password: string;
 
     role: UserRole;
+
+    // Version de los tokens del usuario. Sube al cerrar sesion, y con ella dejan de valer todos
+    // los tokens firmados antes (ver VerifyToken y POST /auth/logout). Opcional porque los
+    // documentos que ya estaban en la base no tienen el campo y valen como version 0.
+    tokenVersion?: number;
 }
 
 // Esta interfaz junta los datos del usuario con las propiedades de un documento de MongoDB
@@ -41,6 +46,11 @@ const UserSchema: Schema = new Schema(
         // Si no se indica, un usuario nuevo es USER. Los ADMIN se crean con el seed
         role: { type: String, enum: USER_ROLES, default: 'USER' },
 
+        // Version de los tokens: empieza en 0 y sube uno cada vez que el usuario cierra sesion.
+        // Los dos tokens llevan la version con la que se firmaron, asi que al subir esta dejan
+        // de valer de inmediato (no hay que esperar a que caduquen).
+        tokenVersion: { type: Number, default: 0 },
+
         // Marca de borrado logico: no borramos el usuario de la base de datos, solo lo ocultamos
         isDeleted: { type: Boolean, default: false },
 
@@ -54,10 +64,13 @@ const UserSchema: Schema = new Schema(
         // Quitamos el campo que usa Mongoose para controlar las versiones
         versionKey: false,
 
-        // Al convertir el usuario a JSON quitamos la contraseña, por si alguna vez se ha leido
+        // Al convertir el usuario a JSON quitamos la contraseña, por si alguna vez se ha leido,
+        // y la version de tokens, que es cosa de la sesion: el cliente no la necesita y no tiene
+        // por que ver cuantas veces ha cerrado sesion el usuario.
         toJSON: {
             transform: (document, result: Record<string, unknown>) => {
                 delete result.password;
+                delete result.tokenVersion;
 
                 return result;
             }
