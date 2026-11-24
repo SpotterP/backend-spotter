@@ -3,6 +3,7 @@ import express from 'express';
 import controller from '../controllers/Auth';
 
 import { Schemas, ValidateJoi } from '../middleware/Joi';
+import { VerifyToken } from '../middleware/VerifyToken';
 
 // Rutas de autenticacion. Son publicas: no piden token (refresh se autentica con su propio
 // refresh token, que va en el body). Cada una valida el body con Joi y llama a su controlador.
@@ -12,9 +13,14 @@ router.post('/login', ValidateJoi(Schemas.auth.login), controller.login);
 // El login del backoffice: el mismo cuerpo que /auth/login, pero solo entra un ADMIN
 router.post('/admin/login', ValidateJoi(Schemas.auth.login), controller.adminLogin);
 router.post('/refresh', ValidateJoi(Schemas.auth.refresh), controller.refresh);
+// Cerrar sesion. A diferencia de las otras cuatro, esta si pide el access token: hay que saber
+// de quien es la sesion. Sube la version de tokens del usuario, asi que el access token y el
+// refresh token que ya existian dejan de valer en la siguiente peticion, en este dispositivo
+// y en cualquier otro donde tuviera la sesion abierta.
+router.post('/logout', VerifyToken, controller.logout);
 export = router;
 
-// Documentacion de Swagger de las cuatro rutas.
+// Documentacion de Swagger de las cinco rutas.
 // security: [] quita el candado: son las unicas rutas que no necesitan token.
 
 /**
@@ -97,4 +103,18 @@ export = router;
  *             example: { token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
+ *
+ * /auth/logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Cierra la sesion
+ *     description: >
+ *       Sube la version de tokens del usuario, asi que el access token con el que se llama y el
+ *       refresh token de esa sesion dejan de valer en la siguiente peticion. No hay que esperar
+ *       a que caduquen: el access token duraba 15 minutos. Cerrar sesion en un dispositivo la
+ *       cierra en todos, porque la version es del usuario, no del dispositivo.
+ *     responses:
+ *       204:
+ *         description: Sesion cerrada. Los tokens anteriores ya no sirven.
+ *       401: { $ref: '#/components/responses/Unauthorized' }
  */
