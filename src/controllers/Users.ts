@@ -43,7 +43,7 @@ const readMe = async (req: Request, res: Response, next: NextFunction) => {
         const user = await UserService.getMe(req.user!.id);
 
         if (user) {
-            // Devolvemos _id, name y email
+            // Devolvemos _id, name, email y role
             res.status(200).json({ user });
         } else {
             // El usuario del token ya no existe (por ejemplo, lo han borrado)

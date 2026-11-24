@@ -33,10 +33,11 @@ export const getUserById = (userId: string): Promise<HydratedDocument<IUserModel
 
 };
 
-// Datos del perfil del propio usuario (id, nombre y email). Devuelve null si ya no existe o esta borrado
+// Datos del perfil del propio usuario (id, nombre, email y rol). Devuelve null si ya no existe o esta borrado
 export const getMe = (userId: string): Promise<HydratedDocument<IUserModel> | null> => {
 
-    return User.findOne({ _id: userId, isDeleted: false }).select('name email');
+    // El rol va en la respuesta para que la app no tenga que guardarlo del login ni suponerlo
+    return User.findOne({ _id: userId, isDeleted: false }).select('name email role');
 
 };
 
