@@ -176,7 +176,7 @@ router.delete('/hard', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), co
  *     tags: [Users]
  *     summary: Devuelve mi perfil
  *     description: >
- *       Devuelve el id, el nombre y el email del usuario de la sesión. El usuario sale del token,
+ *       Devuelve el id, el nombre, el email y el rol del usuario de la sesión. El usuario sale del token,
  *       así que cada uno solo ve el suyo. Lo puede usar cualquier usuario con token.
  *     responses:
  *       200:
@@ -192,6 +192,7 @@ router.delete('/hard', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), co
  *                     _id: { type: string, example: 6ab3f2fe9c500204a7d5f8a1 }
  *                     name: { type: string, example: Marta }
  *                     email: { type: string, example: marta@example.com }
+ *                     role: { type: string, enum: [ADMIN, USER], example: USER }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
