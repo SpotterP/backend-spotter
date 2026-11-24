@@ -22,11 +22,13 @@ export const SocketAuth = (socket: Socket, next: (error?: Error) => void) => {
         // jwt.verify comprueba la firma y que no haya caducado. Un refresh token no vale: se firma con otro secreto
         const payload = jwt.verify(token, config.jwt.secret) as AccessTokenPayload;
 
-        socket.data.user = { id: payload.sub, role: payload.role };
+        // Solo guardamos el id: es lo que hace falta para meter al usuario en su sala
+        socket.data.user = { id: payload.sub };
 
         next();
-    } catch {
-        Logging.warning('Socket rechazado: token no valido o caducado');
+    } catch (error) {
+        // error.message dice por que falla: "jwt expired", "invalid signature"...
+        Logging.warning(`Socket rechazado: ${(error as Error).message}`);
         next(new Error('Token no válido'));
     }
 };

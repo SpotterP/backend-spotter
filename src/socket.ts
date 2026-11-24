@@ -31,5 +31,8 @@ export const initSocket = (server: HttpServer) => {
 // Manda un evento solo a las conexiones abiertas de un usuario.
 // Si ese usuario no tiene ninguna conexion abierta, no pasa nada.
 export const emitToUser = (userId: string, event: string, data: unknown) => {
-    io?.to(`user:${userId}`).emit(event, data);
+    // Si el servidor de sockets todavia no se ha creado, no hay a quien avisar
+    if (io) {
+        io.to(`user:${userId}`).emit(event, data);
+    }
 };
