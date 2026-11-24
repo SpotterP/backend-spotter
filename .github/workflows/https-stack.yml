@@ -1,0 +1,165 @@
+# Prueba de la pila de producción con HTTPS (docker-compose.yml).
+# Levanta Caddy, la web, la API y MongoDB con los dominios "localhost" y "api.localhost": con esos nombres
+# Caddy genera certificados locales solos, así se comprueba el HTTPS sin dominio ni servidor.
+name: Pila HTTPS
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - docker-compose.yml
+      - deploy/**
+      - src/**
+      - package*.json
+      - .github/workflows/https-stack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: https-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stack:
+    name: Levantar la pila y comprobar el HTTPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOMAIN: localhost
+      API_DOMAIN: api.localhost
+      ACME_EMAIL: ci@example.com
+      JWT_SECRET: secreto-de-prueba-del-ci
+      JWT_REFRESH_SECRET: refresh-de-prueba-del-ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Levantar la pila
+        run: docker compose up -d --build
+
+      - name: Esperar a que la API responda por HTTPS
+        run: |
+          for i in $(seq 1 40); do
+            if curl -ksf --resolve api.localhost:443:127.0.0.1 https://api.localhost/ping > /dev/null; then
+              echo "La API responde por HTTPS"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "La API no ha respondido a tiempo"
+          docker compose ps
+          docker compose logs --tail=80
+          exit 1
+
+      - name: Web por HTTPS
+        run: |
+          code=$(curl -ks -o /dev/null -w '%{http_code}' https://localhost/)
+          echo "https://localhost/ -> $code"
+          test "$code" = "200"
+          curl -ks https://localhost/ | grep -q 'id="root"'
+
+      - name: Redirección de http a https
+        run: |
+          out=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost/)
+          echo "http://localhost/ -> $out"
+          echo "$out" | grep -qE '^30[78] https://localhost/'
+
+      - name: API por HTTPS y CORS solo para la web
+        run: |
+          curl -ks --resolve api.localhost:443:127.0.0.1 https://api.localhost/ping
+          echo
+          curl -ks --resolve api.localhost:443:127.0.0.1 -H 'Origin: https://localhost' -D - -o /dev/null https://api.localhost/ping \
+            | tee /dev/stderr | grep -qi '^access-control-allow-origin: https://localhost'
+
+      - name: Login por HTTPS con los datos de ejemplo
+        run: |
+          docker compose exec -T api node build/seed.js
+          code=$(curl -ks --resolve api.localhost:443:127.0.0.1 -o /dev/null -w '%{http_code}' \
+            -X POST https://api.localhost/auth/login -H 'Content-Type: application/json' \
+            -d '{"email":"user@example.com","password":"seminari7"}')
+          echo "POST /auth/login -> $code"
+          test "$code" = "200"
+
+      - name: Socket.IO por HTTPS
+        run: |
+          out=$(curl -ks --resolve api.localhost:443:127.0.0.1 'https://api.localhost/socket.io/?EIO=4&transport=polling')
+          echo "$out"
+          echo "$out" | grep -q '"sid"'
+
+      - name: Logs si algo ha fallado
+        if: failure()
+        run: docker compose logs --tail=100
+
+      - name: Apagar la pila
+        if: always()
+        run: docker compose down -v
+
+  # Comprueba que Caddy pide y recibe un certificado por ACME (el protocolo de Let's Encrypt) con la configuración
+  # de producción, usando Pebble, el servidor de pruebas de Let's Encrypt. No prueba el Let's Encrypt real ni el DNS.
+  acme:
+    name: Certificados por ACME (Pebble)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOMAIN: spotter.test
+      API_DOMAIN: api.spotter.test
+      ACME_EMAIL: ci@example.com
+      JWT_SECRET: secreto-de-prueba-del-ci
+      JWT_REFRESH_SECRET: refresh-de-prueba-del-ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sacar el certificado raíz de Pebble
+        run: |
+          id=$(docker create ghcr.io/letsencrypt/pebble:latest)
+          docker cp "$id:/test/certs/pebble.minica.pem" deploy/pebble.minica.pem
+          docker rm "$id"
+          head -1 deploy/pebble.minica.pem
+
+      - name: Caddyfile de producción apuntando a Pebble
+        run: |
+          # Es el mismo Caddyfile de producción: solo se añaden el servidor ACME de pruebas y su certificado raíz
+          sed 's#email {$ACME_EMAIL}#email {$ACME_EMAIL}\n\tacme_ca https://pebble:14000/dir\n\tacme_ca_root /etc/caddy/pebble.minica.pem#' deploy/Caddyfile > deploy/Caddyfile.pebble
+          cat deploy/Caddyfile.pebble
+
+      - name: Levantar la pila con Pebble
+        run: docker compose -f docker-compose.yml -f deploy/docker-compose.acme-test.yml up -d --build
+
+      - name: Esperar a que Caddy consiga los certificados
+        run: |
+          for name in spotter.test api.spotter.test; do
+            ok=0
+            for i in $(seq 1 60); do
+              issuer=$(echo | openssl s_client -connect 127.0.0.1:443 -servername "$name" 2>/dev/null | openssl x509 -noout -issuer 2>/dev/null || true)
+              if echo "$issuer" | grep -qi pebble; then
+                echo "$name -> $issuer"
+                ok=1
+                break
+              fi
+              sleep 3
+            done
+            if [ "$ok" != "1" ]; then
+              echo "No hay certificado de Pebble para $name (emisor: $issuer)"
+              docker compose -f docker-compose.yml -f deploy/docker-compose.acme-test.yml logs --tail=120 caddy pebble
+              exit 1
+            fi
+          done
+
+      - name: La web y la API responden con el certificado pedido por ACME
+        run: |
+          code=$(curl -ks --resolve spotter.test:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://spotter.test/)
+          echo "https://spotter.test/ -> $code"
+          test "$code" = "200"
+          curl -ks --resolve api.spotter.test:443:127.0.0.1 https://api.spotter.test/ping
+          echo
+
+      - name: Logs si algo ha fallado
+        if: failure()
+        run: docker compose -f docker-compose.yml -f deploy/docker-compose.acme-test.yml logs --tail=100
+
+      - name: Apagar la pila
+        if: always()
+        run: docker compose -f docker-compose.yml -f deploy/docker-compose.acme-test.yml down -v
