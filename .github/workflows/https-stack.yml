@@ -1,0 +1,98 @@
+# Prueba de la pila de producción con HTTPS (docker-compose.yml).
+# Levanta Caddy, la web, la API y MongoDB con los dominios "localhost" y "api.localhost": con esos nombres
+# Caddy genera certificados locales solos, así se comprueba el HTTPS sin dominio ni servidor.
+name: Pila HTTPS
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - docker-compose.yml
+      - deploy/**
+      - src/**
+      - package*.json
+      - .github/workflows/https-stack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: https-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stack:
+    name: Levantar la pila y comprobar el HTTPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOMAIN: localhost
+      API_DOMAIN: api.localhost
+      ACME_EMAIL: ci@example.com
+      JWT_SECRET: secreto-de-prueba-del-ci
+      JWT_REFRESH_SECRET: refresh-de-prueba-del-ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Levantar la pila
+        run: docker compose up -d --build
+
+      - name: Esperar a que la API responda por HTTPS
+        run: |
+          for i in $(seq 1 40); do
+            if curl -ksf --resolve api.localhost:443:127.0.0.1 https://api.localhost/ping > /dev/null; then
+              echo "La API responde por HTTPS"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "La API no ha respondido a tiempo"
+          docker compose ps
+          docker compose logs --tail=80
+          exit 1
+
+      - name: Web por HTTPS
+        run: |
+          code=$(curl -ks -o /dev/null -w '%{http_code}' https://localhost/)
+          echo "https://localhost/ -> $code"
+          test "$code" = "200"
+          curl -ks https://localhost/ | grep -q 'id="root"'
+
+      - name: Redirección de http a https
+        run: |
+          out=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost/)
+          echo "http://localhost/ -> $out"
+          echo "$out" | grep -qE '^30[78] https://localhost/'
+
+      - name: API por HTTPS y CORS solo para la web
+        run: |
+          curl -ks --resolve api.localhost:443:127.0.0.1 https://api.localhost/ping
+          echo
+          curl -ks --resolve api.localhost:443:127.0.0.1 -H 'Origin: https://localhost' -D - -o /dev/null https://api.localhost/ping \
+            | tee /dev/stderr | grep -qi '^access-control-allow-origin: https://localhost'
+
+      - name: Login por HTTPS con los datos de ejemplo
+        run: |
+          docker compose exec -T api node build/seed.js
+          code=$(curl -ks --resolve api.localhost:443:127.0.0.1 -o /dev/null -w '%{http_code}' \
+            -X POST https://api.localhost/auth/login -H 'Content-Type: application/json' \
+            -d '{"email":"user@example.com","password":"seminari7"}')
+          echo "POST /auth/login -> $code"
+          test "$code" = "200"
+
+      - name: Socket.IO por HTTPS
+        run: |
+          out=$(curl -ks --resolve api.localhost:443:127.0.0.1 'https://api.localhost/socket.io/?EIO=4&transport=polling')
+          echo "$out"
+          echo "$out" | grep -q '"sid"'
+
+      - name: Logs si algo ha fallado
+        if: failure()
+        run: docker compose logs --tail=100
+
+      - name: Apagar la pila
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,20 @@
+# Caddy es el proxy que se pone delante de la web y de la API.
+# Pide los certificados de Let's Encrypt, los renueva solo y redirige http a https.
+# Los valores salen de las variables de entorno del docker-compose.yml.
+
+{
+	# Correo para Let's Encrypt (avisos de caducidad)
+	email {$ACME_EMAIL}
+}
+
+# La web: https://<DOMAIN>
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy web:80
+}
+
+# La API y Socket.IO: https://<API_DOMAIN>
+# Caddy deja pasar solo las conexiones WebSocket (wss), no hace falta configurar nada mas
+{$API_DOMAIN} {
+	reverse_proxy api:1337
+}
