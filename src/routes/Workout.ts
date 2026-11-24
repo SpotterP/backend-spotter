@@ -45,7 +45,7 @@ const router = express.Router();
  *     description: >
  *       Cada rutina lleva sus ejercicios completos y su dueño (`owner`, con su id y su nombre). El buscador mira el nombre y la descripción.
  *       Cualquier sesión con token puede consultarlo: un ADMIN ve todas las rutinas, también las
- *       borradas; el resto de usuarios solo ve las activas.
+ *       borradas, y puede filtrar por `owner`; un usuario normal solo ve sus propias rutinas activas.
  *     parameters:
  *       - in: query
  *         name: page
@@ -98,8 +98,8 @@ const router = express.Router();
  */
 
 // Ruta para listar rutinas: primero validamos los parametros de la URL
-// La lectura la puede hacer cualquier sesion: el controlador pasa el rol al servicio
-// y el servicio decide si devuelve solo las activas o todas
+// La lectura la puede hacer cualquier sesion: el controlador pasa el rol y el id del usuario al servicio
+// y el servicio decide: el ADMIN ve todas y un USER solo las suyas activas
 router.get('/', ValidateQuery(Schemas.query.workout), controller.listWorkouts);
 
 // Ruta para crear una rutina nueva
@@ -195,8 +195,8 @@ router.delete('/hard', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), co
  *     description: >
  *       Los ejercicios se guardan como ids, pero esta respuesta los devuelve ya resueltos:
  *       cada elemento de exercises es un objeto Exercise entero, no un id.
- *       Cualquier sesión con token puede consultarlo. Un ADMIN ve también las rutinas borradas;
- *       para el resto, una rutina borrada responde 404.
+ *       Cualquier sesión con token puede consultarlo. Un ADMIN ve cualquier rutina, también las borradas;
+ *       un usuario normal solo ve las suyas, y si la rutina es de otro o está borrada responde 404.
  *     parameters:
  *       - in: path
  *         name: workoutId
@@ -224,7 +224,7 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  *       Hay que enviar la rutina entera, no solo los campos que cambian.
  *       Cada ejercicio se envia como { exercise, sets, reps } y el orden de la lista es el orden de la rutina.
  *       Solo un ADMIN puede cambiar el dueño con `owner`; si lo envia un usuario normal, se ignora.
- *       La puede modificar un ADMIN (cualquier rutina) o el usuario dueño de la rutina (solo las suyas).
+ *       La puede modificar un ADMIN (cualquier rutina) o el usuario dueño de la rutina; si es de otro usuario responde 404.
  *     parameters:
  *       - in: path
  *         name: workoutId
@@ -243,7 +243,6 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  *             schema: { $ref: '#/components/schemas/Workout' }
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
- *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
@@ -263,7 +262,7 @@ router.put('/:workoutId', ValidateId('workoutId'), RequireOwnerOrAdmin, Validate
  *     summary: Borrado lógico de una rutina
  *     description: >
  *       Marca la rutina como borrada (isDeleted). Sigue en la base de datos, pero deja de salir
- *       en los listados y su nombre queda libre. La puede borrar un ADMIN (cualquier rutina) o el usuario dueño (solo las suyas).
+ *       en los listados y su nombre queda libre. La puede borrar un ADMIN (cualquier rutina) o el usuario dueño; si es de otro usuario responde 404.
  *     parameters:
  *       - in: path
  *         name: workoutId
@@ -273,7 +272,6 @@ router.put('/:workoutId', ValidateId('workoutId'), RequireOwnerOrAdmin, Validate
  *       204: { description: Rutina borrada lógicamente }
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
- *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 

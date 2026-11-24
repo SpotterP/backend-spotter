@@ -19,9 +19,9 @@ export const RequireOwnerOrAdmin = async (req: Request, res: Response, next: Nex
         const workout = await Workout.findById(req.params.workoutId).select('owner');
 
         // Si la rutina no existe seguimos: el controlador responde 404
-        // Si existe pero es de otro usuario, 403
+        // Si existe pero es de otro usuario respondemos tambien 404: asi no se revela que existe
         if (workout && String(workout.owner) !== req.user.id) {
-            return res.status(403).json({ message: 'Solo puedes modificar tus propias rutinas' });
+            return res.status(404).json({ message: 'not found' });
         }
 
         next();
