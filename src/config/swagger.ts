@@ -131,6 +131,28 @@ const errorResponse = (description: string, message: string) => ({
     }
 });
 
+// Los cuatro codigos estables de los 401 del flujo de token. El cliente decide con ellos si
+// renueva la sesion, sin comparar el texto del mensaje, que se mantiene igual por los clientes
+// ya desplegados.
+const unauthorizedCodes = ['TOKEN_MISSING', 'TOKEN_INVALID', 'TOKEN_EXPIRED', 'SESSION_REVOKED'];
+
+// El 401 del flujo de token lleva message y code: es el unico error con esa forma
+const unauthorizedResponse = (description: string, message: string, code: string) => ({
+    description,
+    content: {
+        'application/json': {
+            schema: {
+                type: 'object',
+                properties: {
+                    message: { type: 'string' },
+                    code: { type: 'string', enum: unauthorizedCodes }
+                }
+            },
+            example: { message, code }
+        }
+    }
+});
+
 const userExample = {
     _id: '6ab3f2fe9c500204a7d5f8a1',
     name: 'Admin',
@@ -201,7 +223,7 @@ const swaggerDocument = swaggerJsdoc({
                     { token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', user: userExample }
                 ),
                 BadCredentials: errorResponse('El email o la contraseña no son correctos', 'Email o contraseña incorrectos'),
-                Unauthorized: errorResponse('Falta el token, ha caducado o no es válido', 'El token ha caducado'),
+                Unauthorized: unauthorizedResponse('Falta el token, ha caducado o no es válido', 'El token ha caducado', 'TOKEN_EXPIRED'),
                 Forbidden: errorResponse('El usuario no tiene el rol necesario', 'Necesitas el rol ADMIN'),
                 UserOne: okResponse('Un usuario, con la contraseña ya quitada', { type: 'object', properties: { user: userSchema } }, { user: userExample }),
                 ExerciseOne: okResponse('Un ejercicio', { type: 'object', properties: { exercise: exerciseSchema } }, { exercise: exerciseExample }),

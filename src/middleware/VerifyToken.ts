@@ -20,9 +20,10 @@ import type { AccessTokenPayload } from '../types/auth';
 export const VerifyToken = async (req: Request, res: Response, next: NextFunction) => {
     const header = req.headers.authorization;
 
-    // Sin cabecera, o con una que no empieza por "Bearer ", no hay sesion
+    // Sin cabecera, o con una que no empieza por "Bearer ", no hay sesion.
+    // El code es estable: los clientes deciden con el si renuevan la sesion, sin mirar el mensaje
     if (!header || !header.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Falta el token' });
+        return res.status(401).json({ message: 'Falta el token', code: 'TOKEN_MISSING' });
     }
 
     // Nos quedamos con lo que va despues de "Bearer "
@@ -43,7 +44,9 @@ export const VerifyToken = async (req: Request, res: Response, next: NextFunctio
         // despues de firmarlo; si no hay usuario, es que ya no existe o esta borrado.
         // Los tokens firmados antes de existir este campo no lo llevan y cuentan como version 0.
         if (!user || (payload.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
-            return res.status(401).json({ message: 'La sesión ya no es válida' });
+            // SESSION_REVOKED: el token esta bien firmado y no ha caducado, pero la sesion ya no sirve.
+            // El cliente no puede arreglarlo renovando: tiene que volver a entrar
+            return res.status(401).json({ message: 'La sesión ya no es válida', code: 'SESSION_REVOKED' });
         }
 
         // El rol sale de la base, no del token: el token solo dice quien eres, no lo que puedes hacer.
