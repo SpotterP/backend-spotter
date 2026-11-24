@@ -11,7 +11,10 @@ networks:
   default:
     ipam:
       config:
+        # Docker reparte las IPs automáticas solo de la mitad alta (.128 a .255), así las IPs fijas de abajo
+        # (Pebble, el DNS de pruebas y Caddy) no las puede coger antes ningún otro contenedor
         - subnet: 10.30.50.0/24
+          ip_range: 10.30.50.128/25
 
 services:
   caddy:
