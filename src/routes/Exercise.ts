@@ -26,7 +26,6 @@ const router = express.Router();
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
- *       500: { $ref: '#/components/responses/ServerError' }
  */
 
 /**
