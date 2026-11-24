@@ -52,53 +52,6 @@ Al hacer `npm install` se activa solo un hook de Git (`.githooks/pre-commit`, lo
 Antes de cada `git commit` pasa `npm run lint`: si el linter encuentra un error, el commit se cancela y dice qué arreglar.
 Si hace falta, se puede saltar una vez con `git commit --no-verify`, pero lo normal es arreglar el aviso.
 
-## Despliegue en producción con HTTPS (Docker)
-
-La pila de producción está en `docker-compose.yml` y levanta cuatro contenedores:
-
-| Servicio | Qué es |
-|---|---|
-| `caddy` | Proxy que pone el HTTPS: pide y renueva los certificados de Let's Encrypt, y redirige `http` a `https`. Es el único que publica puertos (80 y 443). |
-| `web` | La web ([webapp-spotter](https://github.com/SpotterP/webapp-spotter)), construida desde su rama `dev` con la dirección de la API ya dentro. |
-| `api` | Esta API (el `Dockerfile` de esta carpeta). Socket.IO sale por el mismo puerto. |
-| `mongo` | MongoDB, con los datos en un volumen. No se publica fuera de Docker. |
-
-### Qué hace falta
-- Un servidor con **Docker** y **Docker Compose**, y los puertos **80 y 443** abiertos.
-- Dos registros DNS de tipo A, uno para la web (`spotter.tudominio.com`) y otro para la API (`api.spotter.tudominio.com`), apuntando a la IP del servidor. Sin esto Let's Encrypt no puede dar el certificado.
-
-### Arrancar
-
-```bash
-cp .env.production.example .env.production      # y rellenar el dominio, el correo y los secretos JWT
-docker compose --env-file .env.production up -d --build
-docker compose exec api node build/seed.js      # solo la primera vez: usuarios, ejercicios y rutinas de ejemplo
-```
-
-La web queda en `https://<DOMAIN>` y la API en `https://<API_DOMAIN>`. El primer arranque tarda un poco más, porque Caddy pide los certificados.
-Los certificados se renuevan solos y se guardan en el volumen `caddy_data`.
-
-Otras órdenes útiles:
-
-```bash
-docker compose ps                  # estado de los contenedores
-docker compose logs -f api         # logs de la API (o caddy, web, mongo)
-docker compose --env-file .env.production up -d --build   # actualizar después de un git pull
-docker compose down                # apagar (los datos se conservan; con -v se borran)
-```
-
-### La app móvil
-La app Flutter apunta a la API con `--dart-define`: `flutter run --dart-define=API_URL=https://api.spotter.tudominio.com`.
-
-### Probarlo sin dominio
-Con `DOMAIN=localhost` y `API_DOMAIN=api.localhost` Caddy genera certificados locales, así se puede comprobar el HTTPS en un ordenador sin dominio (el navegador avisará de que el certificado no es de confianza).
-La prueba automática de GitHub Actions (`.github/workflows/https-stack.yml`) hace dos comprobaciones en cada PR que toca la pila:
-
-1. **La pila con HTTPS local:** levanta todo con `localhost` y `api.localhost`, y comprueba la web, la redirección a https, la API con su CORS, el login y el Socket.IO.
-2. **Los certificados por ACME:** levanta la pila con los nombres `spotter.test` y `api.spotter.test` y con Pebble, el servidor de pruebas de Let's Encrypt, y comprueba que Caddy pide y recibe un certificado por cada dominio con el mismo `Caddyfile` de producción.
-
-Lo único que no se puede probar sin un servidor es el Let's Encrypt real: el DNS apuntando al servidor y los puertos 80 y 443 abiertos.
-
 ## Endpoints
 
 Todo salvo `/auth/*`, `/ping` y `/api-docs` pide el token en la cabecera `Authorization: Bearer <token>`.
