@@ -105,7 +105,7 @@ const updateUser = async (req: Request<{ userId: string }>, res: Response, next:
 const softDeleteUser = async (req: Request<{ userId: string }>, res: Response, next: NextFunction) => {
     // Un admin no puede borrarse a si mismo: se quedaria sin acceso al backoffice
     if (req.user?.id === req.params.userId) {
-        return res.status(400).json({ message: 'No puedes borrarte a ti mismo' });
+        return res.status(403).json({ message: 'No puedes borrarte a ti mismo' });
     }
 
     try {
@@ -125,7 +125,7 @@ const softDeleteUser = async (req: Request<{ userId: string }>, res: Response, n
 // Función para el borrado definitivo: elimina al usuario de la base de datos para siempre
 const hardDeleteUser = async (req: Request<{ userId: string }>, res: Response, next: NextFunction) => {
     if (req.user?.id === req.params.userId) {
-        return res.status(400).json({ message: 'No puedes borrarte a ti mismo' });
+        return res.status(403).json({ message: 'No puedes borrarte a ti mismo' });
     }
 
     try {
@@ -145,7 +145,7 @@ const hardDeleteUser = async (req: Request<{ userId: string }>, res: Response, n
 const softDeleteManyUsers = async (req: Request, res: Response, next: NextFunction) => {
     // Un admin no puede borrarse a si mismo: se quedaria sin acceso al backoffice
     if (req.user && req.body.ids.includes(req.user.id)) {
-        return res.status(400).json({ message: 'No puedes borrarte a ti mismo' });
+        return res.status(403).json({ message: 'No puedes borrarte a ti mismo' });
     }
 
     try {
@@ -160,7 +160,7 @@ const softDeleteManyUsers = async (req: Request, res: Response, next: NextFuncti
 const hardDeleteManyUsers = async (req: Request, res: Response, next: NextFunction) => {
     // Un admin no puede borrarse a si mismo: se quedaria sin acceso al backoffice
     if (req.user && req.body.ids.includes(req.user.id)) {
-        return res.status(400).json({ message: 'No puedes borrarte a ti mismo' });
+        return res.status(403).json({ message: 'No puedes borrarte a ti mismo' });
     }
 
     try {

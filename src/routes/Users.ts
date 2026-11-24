@@ -62,7 +62,6 @@ const router = express.Router();
  *                     hasPrevPage: { type: boolean }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
- *       500: { $ref: '#/components/responses/ServerError' }
  */
 
 // Devuelve el listado de usuarios disponibles.
@@ -85,7 +84,6 @@ router.get('/', ValidateQuery(Schemas.query.user), controller.listUsers);
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
- *       500: { $ref: '#/components/responses/ServerError' }
  */
 
 // Ruta para crear un usuario nuevo
@@ -101,7 +99,7 @@ router.post('/', RequireRole('ADMIN'), ValidateJoi(Schemas.user.create), control
  *     summary: Borrado lógico de varios usuarios
  *     description: >
  *       Marca como borrados (isDeleted) los usuarios cuyos ids se envían en el cuerpo. Los que no existen
- *       o ya estaban borrados no cuentan. Si la lista incluye al propio admin responde 400. Solo ADMIN.
+ *       o ya estaban borrados no cuentan. Si la lista incluye al propio admin responde 403. Solo ADMIN.
  *     requestBody:
  *       required: true
  *       content:
@@ -140,7 +138,7 @@ router.delete('/', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), contro
  *     summary: Borrado definitivo de varios usuarios
  *     description: >
  *       Elimina de la base de datos los usuarios cuyos ids se envían en el cuerpo. No se puede deshacer.
- *       Si la lista incluye al propio admin responde 400. Solo ADMIN.
+ *       Si la lista incluye al propio admin responde 403. Solo ADMIN.
  *     requestBody:
  *       required: true
  *       content:
@@ -271,7 +269,7 @@ router.put('/:userId', RequireRole('ADMIN'), ValidateId('userId'), ValidateJoi(S
  *     summary: Borrado lógico de un usuario
  *     description: >
  *       Marca al usuario como borrado (isDeleted). Sigue en la base de datos, pero deja de salir
- *       en los listados y su email queda libre. Solo ADMIN. Un admin no puede borrarse a sí mismo.
+ *       en los listados y su email queda libre. Solo ADMIN. Un admin no puede borrarse a sí mismo (403).
  *     parameters:
  *       - in: path
  *         name: userId
@@ -320,7 +318,7 @@ router.patch('/:userId/restore', RequireRole('ADMIN'), ValidateId('userId'), con
  *     summary: Borrado definitivo de un usuario
  *     description: >
  *       Elimina al usuario de la base de datos para siempre. No se puede deshacer.
- *       Solo ADMIN. Un admin no puede borrarse a sí mismo.
+ *       Solo ADMIN. Un admin no puede borrarse a sí mismo (403).
  *     parameters:
  *       - in: path
  *         name: userId
