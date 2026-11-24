@@ -11,7 +11,8 @@ import type { UserRole } from '../models/User';
 export const RequireRole = (role: UserRole) => {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) {
-            return res.status(401).json({ message: 'Falta el token' });
+            // Mismo code que el resto de 401 por falta de sesión: el cliente decide por código
+            return res.status(401).json({ message: 'Falta el token', code: 'TOKEN_MISSING' });
         }
 
         if (req.user.role !== role) {

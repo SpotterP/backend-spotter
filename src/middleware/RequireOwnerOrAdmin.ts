@@ -7,7 +7,8 @@ import Workout from '../models/Workout';
 export const RequireOwnerOrAdmin = async (req: Request, res: Response, next: NextFunction) => {
     try {
         if (!req.user) {
-            return res.status(401).json({ message: 'Falta el token' });
+            // Mismo code que el resto de 401 por falta de sesión: el cliente decide por código
+            return res.status(401).json({ message: 'Falta el token', code: 'TOKEN_MISSING' });
         }
 
         // El ADMIN puede tocar las rutinas de todo el mundo
