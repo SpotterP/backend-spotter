@@ -36,18 +36,18 @@ export const createWorkout = async (data: NewWorkout, ownerId: string): Promise<
 
 // Funcion que busca una rutina por su ID en la base de datos.
 // El ADMIN consulta todas las rutinas, tambien las borradas logicamente.
-// Cualquier otra sesion solo ve las activas: si la rutina esta borrada se comporta
+// Un USER solo ve las suyas y activas: si la rutina es de otro o esta borrada se comporta
 // como si no existiera y el controlador responde 404.
 // El populate carga los documentos completos de Exercise en lugar de dejar los ObjectId,
 // para que el controlador pueda responder con los ejercicios enteros. Si no hay ejercicios,
 // el populate mantiene una lista vacia.
-export const getWorkoutById = (workoutId: string, isAdmin: boolean): Promise<WorkoutDocument | null> => {
+export const getWorkoutById = (workoutId: string, isAdmin: boolean, userId: string): Promise<WorkoutDocument | null> => {
 
-    // Con el rol ADMIN buscamos por ID a secas; el resto exige ademas isDeleted: false.
+    // Con el rol ADMIN buscamos por ID a secas; el resto exige ademas que sea suya y no este borrada.
     // En los dos casos cargamos los ejercicios referenciados.
     return isAdmin
         ? Workout.findById(workoutId).populate('exercises.exercise').populate('owner', 'name')
-        : Workout.findOne({ _id: workoutId, isDeleted: false }).populate('exercises.exercise').populate('owner', 'name');
+        : Workout.findOne({ _id: workoutId, owner: userId, isDeleted: false }).populate('exercises.exercise').populate('owner', 'name');
 
 };
 
@@ -113,18 +113,18 @@ export type ListWorkoutsInput = { page: number; limit: number; search?: string; 
 
 // Devuelve una pagina de rutinas, filtrada por dia y/o por texto en nombre o descripcion.
 // El ADMIN ve todas las rutinas; cualquier otra sesion solo las activas (isDeleted: false).
-export const listWorkouts = async ({ page, limit, search, day, owner, sort, order }: ListWorkoutsInput, isAdmin: boolean) => {
+export const listWorkouts = async ({ page, limit, search, day, owner, sort, order }: ListWorkoutsInput, isAdmin: boolean, userId: string) => {
 
-    // El ADMIN consulta todo, asi que su filtro empieza vacio; el resto empieza solo con las activas
-    const filter: Record<string, unknown> = isAdmin ? {} : { isDeleted: false };
+    // El ADMIN consulta todo, asi que su filtro empieza vacio; un USER empieza solo con sus rutinas activas
+    const filter: Record<string, unknown> = isAdmin ? {} : { isDeleted: false, owner: userId };
 
     // Filtro por dia de la semana (rutinas que incluyen ese dia), si se ha pedido
     if (day) {
         filter.days = day;
     }
 
-    // Filtro por dueño: solo las rutinas de ese usuario, si se ha pedido
-    if (owner) {
+    // Filtro por dueño (solo para el ADMIN): las rutinas de ese usuario. Un USER siempre ve solo las suyas
+    if (owner && isAdmin) {
         filter.owner = owner;
     }
 
