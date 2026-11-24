@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import SessionService from '../services/SessionService';
+import { emitToUser } from '../socket';
 
 // Controladores de los entrenamientos del propio usuario (/users/me/sessions).
 // El usuario siempre es el del token (req.user.id).
@@ -8,6 +9,9 @@ import SessionService from '../services/SessionService';
 const createSession = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const session = await SessionService.createSession(req.body, req.user!.id);
+
+        // Avisamos en tiempo real a las conexiones abiertas de este usuario (Socket.IO)
+        emitToUser(req.user!.id, 'session:created', session);
 
         // 201: se ha creado un recurso nuevo
         res.status(201).json({ session });

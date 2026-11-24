@@ -107,11 +107,33 @@ Los cuerpos que se envían:
   `/users/me/workouts/:workoutId`. Cada usuario solo ve y toca las suyas; una rutina de otro responde 404.
 - **Usuarios**: `name`, `email`, `password` (8 caracteres como mínimo) y `role` (`ADMIN` o `USER`).
 
+## Tiempo real (Socket.IO)
+
+La API avisa en tiempo real cuando un usuario guarda un entrenamiento. Socket.IO va sobre el mismo servidor y el mismo puerto que la API.
+Swagger no documenta los sockets, así que se explica aquí.
+
+- **Conexión:** hay que enviar el access token en el handshake, `io(url, { auth: { token } })`. Sin token, o con uno caducado o falso, la conexión se rechaza con un error.
+- **Sala:** al conectar, cada usuario entra en su sala personal `user:<id>`. Solo recibe sus propios avisos.
+- **Evento `session:created`:** lo recibe el usuario cuando guarda un entrenamiento con `POST /users/me/sessions`. Trae el entrenamiento guardado.
+  Si el usuario no tiene ninguna conexión abierta, el entrenamiento se guarda igual (201).
+
+Ejemplo de cliente (con `socket.io-client`):
+
+```js
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:1337', { auth: { token } });
+
+socket.on('session:created', (session) => console.log('Entrenamiento nuevo', session));
+socket.on('connect_error', (error) => console.log('No se pudo conectar:', error.message));
+```
+
 ## Estructura del proyecto
 
 ```
 src/
   server.ts        Punto de entrada: conecta con MongoDB, registra middleware y rutas, y arranca el servidor
+  socket.ts        Socket.IO: crea el servidor de sockets, una sala por usuario y emitToUser()
   seed.ts          Script que llena la base de datos con los datos de ejemplo
   migrate-roles.ts Script de una sola vez: pasa los roles antiguos (admin, user) a ADMIN y USER
   seed-data.ts     Los datos de ejemplo: usuarios, ejercicios y rutinas
@@ -132,6 +154,7 @@ src/
     VerifyToken.ts   Comprueba el token de la cabecera Authorization y deja el usuario en req.user (401)
     RequireRole.ts   Deja pasar solo a un rol concreto (403)
     Joi.ts           Guardas: validan el body (422) y el id de la URL (400)
+    SocketAuth.ts    Comprueba el token en la conexion de Socket.IO y la rechaza si no vale
     Cors.ts          Cabeceras de CORS, configuradas con CORS_ORIGIN
     Logger.ts        Escribe en consola cada petición y su código de respuesta
     ErrorHandler.ts  Convierte cualquier error en su código: 400, 401, 404, 409, 422 o 500

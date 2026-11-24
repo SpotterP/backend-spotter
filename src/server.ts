@@ -6,6 +6,7 @@ import { Cors } from './middleware/Cors';
 import Logging from './library/Logging';
 import Logger from './middleware/Logger';
 import ErrorHandler from './middleware/ErrorHandler';
+import { initSocket } from './socket';
 import { VerifyToken } from './middleware/VerifyToken';
 import authRoutes from './routes/Auth';
 import exerciseRoutes from './routes/Exercise';
@@ -84,5 +85,7 @@ const StartServer = () => {
     router.use(ErrorHandler);
 
     const server = http.createServer(router);
+    // Socket.IO comparte el servidor HTTP: los avisos en tiempo real van por el mismo puerto
+    initSocket(server);
 server.listen(config.server.port, () => Logging.info(`Server is running on port ${config.server.port}`));
 };
