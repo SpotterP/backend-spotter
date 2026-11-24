@@ -1,6 +1,7 @@
 import mongoose, { HydratedDocument } from 'mongoose';
 import WorkoutSession, { IWorkoutSession } from '../models/WorkoutSession';
 import { buildPageInfo, getSkip } from '../utils/pagination';
+import { assertExercisesExist, assertWorkoutOfUser } from '../utils/references';
 
 // Un ejercicio del entrenamiento tal y como llega en el body: el id del ejercicio (texto) y sus series
 export type SessionExerciseInput = { exercise: string; sets: { reps: number; weight: number }[] };
@@ -17,7 +18,13 @@ export type NewSession = {
 type SessionDocument = HydratedDocument<IWorkoutSession>;
 
 // Guarda un entrenamiento terminado del usuario. La app lo envia entero al finalizar.
-export const createSession = (data: NewSession, userId: string): Promise<SessionDocument> => {
+export const createSession = async (data: NewSession, userId: string): Promise<SessionDocument> => {
+
+    // La rutina (si la hay) tiene que ser del usuario, y los ejercicios tienen que existir; si no, 404
+    if (data.workout) {
+        await assertWorkoutOfUser(data.workout, userId);
+    }
+    await assertExercisesExist((data.exercises ?? []).map(({ exercise }) => exercise));
 
     const session = new WorkoutSession({
         ...data,

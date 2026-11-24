@@ -17,7 +17,7 @@ const router = express.Router();
  *     summary: Crea una rutina
  *     description: >
  *       Solo un ADMIN puede crear rutinas. Puede indicar el dueño con `owner` (id de un usuario);
- *       si no lo indica, la rutina es del propio ADMIN. Cada ejercicio se envia como
+ *       si no lo indica, la rutina es del propio ADMIN. Si el dueño o algún ejercicio no existe, responde 404. Cada ejercicio se envia como
  *       { exercise, sets, reps } y el orden de la lista es el orden de la rutina.
  *     requestBody:
  *       required: true
@@ -32,6 +32,7 @@ const router = express.Router();
  *             schema: { $ref: '#/components/schemas/Workout' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
  */
