@@ -14,7 +14,8 @@
         "seed": "tsx src/seed.ts",
         "migrate-roles": "tsx src/migrate-roles.ts",
         "lint": "oxlint src",
-        "lint:fix": "oxlint src --fix"
+        "lint:fix": "oxlint src --fix",
+        "prepare": "git config core.hooksPath .githooks || true"
     },
     "author": "",
     "license": "MIT",
