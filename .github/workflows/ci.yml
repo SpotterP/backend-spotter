@@ -6,10 +6,13 @@ on:
   push:
     branches: [dev]
 
-# Dos pushes seguidos no compiten: el segundo cancela al primero.
+# Los pushes se encolan en vez de pisarse: cada commit publica su tag sha-<corto>
+# y `dev` queda siempre en el último que termine.
+# GitHub puede descartar un run aún encolado si llegan varios pushes de golpe;
+# lo que no se pierde nunca es que `dev` acabe en el commit más nuevo.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -60,6 +63,10 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
+          # Sin esta etiqueta, GHCR no enlaza el paquete con el repositorio y la
+          # imagen no aparece en su página de paquetes.
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           tags: |
             ${{ steps.image.outputs.name }}:dev
             ${{ steps.image.outputs.name }}:sha-${{ steps.image.outputs.sha_short }}
