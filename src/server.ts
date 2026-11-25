@@ -87,5 +87,16 @@ const StartServer = () => {
     const server = http.createServer(router);
     // Socket.IO comparte el servidor HTTP: los avisos en tiempo real van por el mismo puerto
     initSocket(server);
-server.listen(config.server.port, () => Logging.info(`Server is running on port ${config.server.port}`));
+
+    // La direccion de escucha es opcional: si HOST no esta en el .env se llama a listen sin
+    // direccion, que es como estaba antes y escucha en todas las interfaces. Se pide en el
+    // .env cuando hace falta dejar escrito por donde entra el proxy o la red interna.
+    const onListening = () =>
+        Logging.info(`Server is running on ${config.server.host ?? 'all interfaces'}, port ${config.server.port}`);
+
+    if (config.server.host) {
+        server.listen(config.server.port, config.server.host, onListening);
+    } else {
+        server.listen(config.server.port, onListening);
+    }
 };

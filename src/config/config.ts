@@ -21,6 +21,12 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 const SERVER_PORT = process.env.SERVER_PORT ? Number(process.env.SERVER_PORT) : 1337;
 
+// Direccion en la que escucha el servidor. Se deja SIN valor por defecto a proposito: si la
+// variable no existe, el servidor se comporta igual que antes de que esta opcion existiera.
+// Sin direccion, Node escucha en todas las interfaces ("::", que en Linux cubre IPv4 e IPv6).
+// Con "0.0.0.0" escucha solo por IPv4; con "127.0.0.1", solo desde la propia maquina.
+const SERVER_HOST = process.env.HOST;
+
 // Secretos con los que se firman los tokens. Son dos distintos para que un refresh token
 // no sirva como access token ni al revés.
 const JWT_SECRET = required('JWT_SECRET');
@@ -36,7 +42,8 @@ export const config = {
         url: MONGO_URL
     },
     server: {
-        port: SERVER_PORT
+        port: SERVER_PORT,
+        host: SERVER_HOST
     },
     cors: {
         origin: CORS_ORIGIN
