@@ -1,0 +1,25 @@
+# Lo que se instala o se genera se crea dentro de la imagen, no se copia
+node_modules
+build
+coverage
+
+# Repositorio y herramientas
+.git
+.gitignore
+.githooks
+.github
+.vscode
+.atl
+*.md
+Dockerfile
+.dockerignore
+
+# Ficheros de agente: no forman parte de la aplicación
+AGENTS.md
+kanvas.json
+.agents
+.claude
+
+# Valores de entorno: nunca dentro de la imagen (el contenedor los recibe en ejecución)
+.env
+.env.*
