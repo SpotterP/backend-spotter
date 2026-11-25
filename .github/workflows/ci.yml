@@ -1,9 +1,12 @@
 name: CI
 
 # En dev, cada commit deja una imagen nueva: es lo que se despliega en ese entorno.
+# En un pull request contra dev solo se comprueba que compila y pasa el lint: no se publica nada.
 # Cuando pasemos a main, el disparador cambiará a tags de versión.
 on:
   push:
+    branches: [dev]
+  pull_request:
     branches: [dev]
 
 # Los pushes se encolan en vez de pisarse: cada commit publica su tag sha-<corto>
@@ -35,6 +38,8 @@ jobs:
 
   image:
     name: Build and push image
+    # La imagen solo se publica cuando algo entra en dev, nunca desde un pull request.
+    if: github.event_name == 'push'
     needs: verify
     runs-on: ubuntu-latest
     permissions:
