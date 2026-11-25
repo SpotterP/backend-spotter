@@ -2,15 +2,12 @@ import { NextFunction, Request, Response } from 'express';
 import UserService from '../services/UserService';
 
 // Devuelve los datos básicos de los usuarios (id y nombre) con paginación y buscador,
-// para que el frontend pueda mostrarlos.
+// para que el backoffice pueda mostrarlos. Solo ADMIN (lo exige la ruta), así que la vista
+// incluye también los usuarios borrados lógicamente.
 const listUsers = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // El servicio necesita saber el rol de la sesion: el ADMIN ve todos los usuarios
-        // (tambien los borrados) y cualquier otra sesion solo los activos
-        const isAdmin = req.user?.role === 'ADMIN';
-
         // ValidateQuery ya ha comprobado y convertido los parametros de la URL
-        const result = await UserService.listUsers(res.locals.query, isAdmin);
+        const result = await UserService.listUsers(res.locals.query);
 
         // Devolvemos { users, pagination }
         res.status(200).json(result);
@@ -32,6 +29,24 @@ const createUser = async (req: Request, res: Response, next: NextFunction) => {
     } catch (error) {
         // Si ocurre algun error lo pasamos al siguiente middleware
         // para que se encargue de gestionarlo
+        next(error);
+    }
+};
+
+// Función para ver el perfil del usuario de la sesión (GET /users/me)
+// El id sale del token (req.user), no de la URL, asi que cada usuario solo ve el suyo
+const readMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const user = await UserService.getMe(req.user!.id);
+
+        if (user) {
+            // Devolvemos _id, name, email y role
+            res.status(200).json({ user });
+        } else {
+            // El usuario del token ya no existe (por ejemplo, lo han borrado)
+            res.status(404).json({ message: 'not found' });
+        }
+    } catch (error) {
         next(error);
     }
 };
@@ -87,7 +102,7 @@ const updateUser = async (req: Request<{ userId: string }>, res: Response, next:
 const softDeleteUser = async (req: Request<{ userId: string }>, res: Response, next: NextFunction) => {
     // Un admin no puede borrarse a si mismo: se quedaria sin acceso al backoffice
     if (req.user?.id === req.params.userId) {
-        return res.status(400).json({ message: 'No puedes borrarte a ti mismo' });
+        return res.status(403).json({ message: 'No puedes borrarte a ti mismo' });
     }
 
     try {
@@ -107,7 +122,7 @@ const softDeleteUser = async (req: Request<{ userId: string }>, res: Response, n
 // Función para el borrado definitivo: elimina al usuario de la base de datos para siempre
 const hardDeleteUser = async (req: Request<{ userId: string }>, res: Response, next: NextFunction) => {
     if (req.user?.id === req.params.userId) {
-        return res.status(400).json({ message: 'No puedes borrarte a ti mismo' });
+        return res.status(403).json({ message: 'No puedes borrarte a ti mismo' });
     }
 
     try {
@@ -127,7 +142,7 @@ const hardDeleteUser = async (req: Request<{ userId: string }>, res: Response, n
 const softDeleteManyUsers = async (req: Request, res: Response, next: NextFunction) => {
     // Un admin no puede borrarse a si mismo: se quedaria sin acceso al backoffice
     if (req.user && req.body.ids.includes(req.user.id)) {
-        return res.status(400).json({ message: 'No puedes borrarte a ti mismo' });
+        return res.status(403).json({ message: 'No puedes borrarte a ti mismo' });
     }
 
     try {
@@ -142,7 +157,7 @@ const softDeleteManyUsers = async (req: Request, res: Response, next: NextFuncti
 const hardDeleteManyUsers = async (req: Request, res: Response, next: NextFunction) => {
     // Un admin no puede borrarse a si mismo: se quedaria sin acceso al backoffice
     if (req.user && req.body.ids.includes(req.user.id)) {
-        return res.status(400).json({ message: 'No puedes borrarte a ti mismo' });
+        return res.status(403).json({ message: 'No puedes borrarte a ti mismo' });
     }
 
     try {
@@ -170,4 +185,4 @@ const restoreUser = async (req: Request<{ userId: string }>, res: Response, next
 };
 
 // Exportamos todas las funciones para poder utilizarlas desde las rutas
-export default { listUsers, createUser, readUser, updateUser, softDeleteUser, restoreUser, hardDeleteUser, softDeleteManyUsers, hardDeleteManyUsers };
+export default { listUsers, readMe, createUser, readUser, updateUser, softDeleteUser, restoreUser, hardDeleteUser, softDeleteManyUsers, hardDeleteManyUsers };

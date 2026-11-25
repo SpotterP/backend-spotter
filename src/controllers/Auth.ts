@@ -58,11 +58,17 @@ const refresh = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const result = await AuthService.refresh(req.body.refreshToken);
 
-        if (result) {
+        // Ojo con el orden: 'REVOKED' es un string, asi que es "verdadero" y hay que mirarlo
+        // antes que el caso bueno, o se colaria como una sesion valida con un 200.
+        if (result === 'REVOKED') {
+            // 401: el usuario cerró sesión después de que se firmara este refresh token.
+            // SESSION_REVOKED: renovar no lo arregla, hay que volver a iniciar sesión
+            res.status(401).json({ message: 'La sesión ya no es válida', code: 'SESSION_REVOKED' });
+        } else if (result) {
             // Devolvemos { token }
             res.status(200).json(result);
         } else {
-            res.status(401).json({ message: 'El usuario ya no existe' });
+            res.status(401).json({ message: 'El usuario ya no existe', code: 'SESSION_REVOKED' });
         }
     } catch (error) {
         // Si el refresh token está caducado o no es válido, el ErrorHandler responde 401
@@ -70,4 +76,23 @@ const refresh = async (req: Request, res: Response, next: NextFunction) => {
     }
 };
 
-export default { register, login, adminLogin, refresh };
+// Función para cerrar la sesión: el usuario deja de poder usar los tokens que tenía
+const logout = async (req: Request, res: Response, next: NextFunction) => {
+    // VerifyToken ha dejado el usuario del token en req.user
+    const userId = req.user?.id;
+
+    if (!userId) {
+        return res.status(401).json({ message: 'Falta el token', code: 'TOKEN_MISSING' });
+    }
+
+    try {
+        await AuthService.logout(userId);
+
+        // 204: la sesión está cerrada y no hay nada que devolver
+        res.status(204).send();
+    } catch (error) {
+        next(error);
+    }
+};
+
+export default { register, login, adminLogin, refresh, logout };

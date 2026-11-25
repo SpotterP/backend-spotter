@@ -3,7 +3,7 @@ import Joi, { ObjectSchema } from 'joi';
 import { NextFunction, Request, Response } from 'express';
 
 import { EXERCISE_CATEGORIES,  IExercise } from '../models/Exercise';
-import { DAYS_OF_WEEK,  IWorkout } from '../models/Workout';
+import { DAYS_OF_WEEK } from '../models/Workout';
 import { IUser, USER_ROLES } from '../models/User';
 
 // Funcion que se encarga de validar los datos que llegan en una petición
@@ -11,6 +11,11 @@ import { IUser, USER_ROLES } from '../models/User';
 export const ValidateJoi = (schema: ObjectSchema) => {
     return async (req: Request, res: Response, next: NextFunction) => {
         try {
+            // Si la peticion no trae body (o trae un tipo que Express no lee, como texto plano),
+            // req.body llega como undefined. Lo tratamos como un objeto vacio: asi Joi responde 422 diciendo
+            // que campos faltan, en vez de que el controlador falle al leer req.body.email (500)
+            req.body = req.body ?? {};
+
             // Comprobamos que los datos del body cumplen el esquema
             await schema.validateAsync(req.body);
 
@@ -81,6 +86,45 @@ const bulkIds = Joi.object({
     ids: Joi.array().items(Joi.string().pattern(OBJECT_ID)).min(1).max(100).unique().required()
 });
 
+// Un ejercicio de una rutina: id del ejercicio del catalogo y sus series y repeticiones (enteros desde 1)
+const workoutExercise = Joi.object({
+    exercise: Joi.string().pattern(OBJECT_ID).required().example('6ab2d1ad9ada2730451295a7'),
+    sets: Joi.number().integer().min(1).required().example(4),
+    reps: Joi.number().integer().min(1).required().example(10)
+});
+
+// Lista de ejercicios de una rutina; el orden del array es el orden de la rutina
+const workoutExercises = Joi.array().items(workoutExercise).example([{ exercise: '6ab2d1ad9ada2730451295a7', sets: 4, reps: 10 }]);
+
+// Dueño de una rutina: id de un usuario
+const workoutOwner = Joi.string().pattern(OBJECT_ID).example('6ab2d1ad9ada2730451295a7');
+
+// Esquema para crear una rutina
+const workoutCreate = Joi.object({
+    // El nombre es obligatorio
+    name: Joi.string().trim().required().example('Pierna'),
+
+    // La descripcion es opcional y puede ser un string vacio
+    description: Joi.string().allow('').optional().example('Rutina de pierna'),
+
+    // Los dias son opcionales (pueden ser una lista vacia), sin repetidos
+    days: Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)).unique().example(['MONDAY', 'THURSDAY']),
+
+    // Los ejercicios son opcionales. El orden de la lista es el orden de la rutina
+    exercises: workoutExercises
+});
+
+// Esquema para actualizar una rutina
+const workoutUpdate = Joi.object({
+    // El nombre es obligatorio tambien al actualizar
+    name: Joi.string().trim().required(),
+
+    // El resto de campos son opcionales
+    description: Joi.string().allow('').optional(),
+    days: Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)).unique(),
+    exercises: workoutExercises
+});
+
 // Aqui tenemos todos los esquemas de validacion que utilizamos en la aplicacion
 export const Schemas = {
     // Borrado multiple (lo usan las tres entidades)
@@ -91,13 +135,21 @@ export const Schemas = {
             ...listQuery,
             category: Joi.string().valid(...EXERCISE_CATEGORIES),
             // Columnas por las que se pueden ordenar los ejercicios
-            ...sortQuery(['name', 'category', 'sets', 'reps'])
+            ...sortQuery(['name', 'category'])
         }),
         workout: Joi.object({
             ...listQuery,
-            dayOfWeek: Joi.string().valid(...DAYS_OF_WEEK),
+            // Rutinas que incluyen este dia de la semana
+            day: Joi.string().valid(...DAYS_OF_WEEK),
+            // Solo las rutinas de este usuario (id del dueño)
+            owner: Joi.string().pattern(OBJECT_ID),
             // Columnas por las que se pueden ordenar las rutinas
-            ...sortQuery(['name', 'description', 'dayOfWeek'])
+            ...sortQuery(['name', 'description'])
+        }),
+        // Los entrenamientos solo tienen pagina y limite
+        session: Joi.object({
+            page: listQuery.page,
+            limit: listQuery.limit
         }),
         user: Joi.object({
             ...listQuery,
@@ -137,53 +189,50 @@ export const Schemas = {
             name: Joi.string().trim().required().example('Press de banca'),
 
             // La categoria es obligatoria y solo puede ser una de las permitidas
-            category: Joi.string().valid(...EXERCISE_CATEGORIES).required().example('CHEST'),
-
-            // Las series son opcionales y no pueden ser negativas
-            sets: Joi.number().integer().min(0).example(4),
-
-            // Las repeticiones tambien son opcionales y no pueden ser negativas
-            reps: Joi.number().integer().min(0).example(10)
+            category: Joi.string().valid(...EXERCISE_CATEGORIES).required().example('CHEST')
         }),
 
         // Esquema que se utiliza para actualizar un ejercicio
         update: Joi.object<IExercise>({
             // Estos campos son obligatorios tambien al actualizar
             name: Joi.string().trim().required(),
-            category: Joi.string().valid(...EXERCISE_CATEGORIES).required(),
-
-            // El resto de campos son opcionales
-            sets: Joi.number().integer().min(0),
-            reps: Joi.number().integer().min(0)
+            category: Joi.string().valid(...EXERCISE_CATEGORIES).required()
         })
     },
 
-    // Validaciones relacionadas con las rutinas
+    // Validaciones relacionadas con las rutinas (las usan tanto el ADMIN como el propio usuario)
     workout: {
-        // Esquema que se utiliza cuando queremos crear una rutina
-        create: Joi.object<IWorkout>({
-            // El nombre es obligatorio
-            name: Joi.string().trim().required().example('Dia de pecho'),
+        // Esquema que se utiliza cuando el usuario crea una rutina. El dueño no se envia: es el usuario del token
+        create: workoutCreate,
 
-            // La descripcion es opcional y puede ser un string vacio
-            description: Joi.string().allow('').optional().example('Rutina corta para el gimnasio'),
+        // Esquema que se utiliza para actualizar una rutina (nombre, ejercicios, orden, series, repeticiones y dias)
+        update: workoutUpdate,
 
-            // El dia de la semana es obligatorio y solo puede ser uno de los permitidos
-            dayOfWeek: Joi.string().valid(...DAYS_OF_WEEK).required().example('MONDAY'),
+        // Igual que los anteriores, pero el ADMIN tambien puede indicar el dueño (owner) de la rutina
+        adminCreate: workoutCreate.keys({ owner: workoutOwner }),
+        adminUpdate: workoutUpdate.keys({ owner: workoutOwner })
+    },
 
-            // Los ejercicios son opcionales y cada uno tiene que ser un id valido de MongoDB
-            exercises: Joi.array().items(Joi.string().regex(OBJECT_ID)).example(['6ab2d1ad9ada2730451295a7'])
-        }),
+    // Validaciones relacionadas con los entrenamientos realizados
+    session: {
+        // Esquema que se utiliza para guardar un entrenamiento terminado. El usuario es el del token
+        create: Joi.object({
+            // La rutina es opcional: no se envia si el entrenamiento empezo de cero
+            workout: Joi.string().pattern(OBJECT_ID).example('6ab2d1ad9ada2730451295a7'),
 
-        // Esquema que se utiliza para actualizar una rutina
-        update: Joi.object<IWorkout>({
-            // Estos campos son obligatorios tambien al actualizar
-            name: Joi.string().trim().required(),
-            dayOfWeek: Joi.string().valid(...DAYS_OF_WEEK).required(),
+            // Fechas de inicio y fin. El fin no puede ser antes que el inicio
+            startedAt: Joi.date().iso().required().example('2026-11-17T18:00:00.000Z'),
+            finishedAt: Joi.date().iso().min(Joi.ref('startedAt')).required().example('2026-11-17T19:05:00.000Z'),
 
-            // El resto de campos son opcionales
-            description: Joi.string().allow('').optional(),
-            exercises: Joi.array().items(Joi.string().regex(OBJECT_ID))
+            // Ejercicios hechos, cada uno con sus series (repeticiones y peso en kg)
+            exercises: Joi.array().items(
+                Joi.object({
+                    exercise: Joi.string().pattern(OBJECT_ID).required().example('6ab2d1ad9ada2730451295a7'),
+                    sets: Joi.array()
+                        .items(Joi.object({ reps: Joi.number().integer().min(1).required().example(10), weight: Joi.number().min(0).required().example(60) }))
+                        .required()
+                })
+            )
         })
     },
 

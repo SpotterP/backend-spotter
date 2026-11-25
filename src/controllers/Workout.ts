@@ -5,7 +5,10 @@ import WorkoutService from '../services/WorkoutService';
 // Cogemos los datos que nos llegan en el body y se los pasamos al servicio
 const createWorkout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const workout = await WorkoutService.createWorkout(req.body);
+        // La rutina creada desde el backoffice es del ADMIN que la crea
+        // El ADMIN puede indicar el dueño (owner); si no lo indica, la rutina es suya
+        const { owner, ...data } = req.body;
+        const workout = await WorkoutService.createWorkout(data, owner ?? req.user!.id);
 
         // Si se ha creado correctamente devolvemos la rutina creada
         // El codigo 201 indica que se ha creado un recurso nuevo
@@ -28,7 +31,7 @@ const readWorkout = async (req: Request<{ workoutId: string }>, res: Response, n
         const isAdmin = req.user?.role === 'ADMIN';
 
         // Buscamos la rutina usando el servicio
-        const workout = await WorkoutService.getWorkoutById(workoutId, isAdmin);
+        const workout = await WorkoutService.getWorkoutById(workoutId, isAdmin, req.user!.id);
 
         // Comprobamos si hemos encontrado la rutina
         if (workout) {
@@ -51,7 +54,13 @@ const updateWorkout = async (req: Request<{ workoutId: string }>, res: Response,
 
     try {
         // Pasamos al servicio el ID de la rutina y los nuevos datos
-        const workout = await WorkoutService.updateWorkout(workoutId, req.body);
+        // Solo un ADMIN puede cambiar el dueño de una rutina: si lo envia un usuario normal, se ignora
+        const data = { ...req.body };
+        if (req.user?.role !== 'ADMIN') {
+            delete data.owner;
+        }
+
+        const workout = await WorkoutService.updateWorkout(workoutId, data);
 
         // Comprobamos si se ha encontrado y actualizado la rutina
         if (workout) {
@@ -71,11 +80,11 @@ const updateWorkout = async (req: Request<{ workoutId: string }>, res: Response,
 const listWorkouts = async (req: Request, res: Response, next: NextFunction) => {
     try {
         // El servicio necesita saber el rol de la sesion: el ADMIN ve todas las rutinas
-        // y cualquier otra sesion solo las activas
+        // y un USER solo las suyas que estan activas
         const isAdmin = req.user?.role === 'ADMIN';
 
         // ValidateQuery ya ha comprobado y convertido los parametros de la URL
-        const result = await WorkoutService.listWorkouts(res.locals.query, isAdmin);
+        const result = await WorkoutService.listWorkouts(res.locals.query, isAdmin, req.user!.id);
 
         // Devolvemos la pagina de rutinas junto con los datos de paginacion
         res.status(200).json(result);

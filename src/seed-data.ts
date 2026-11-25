@@ -27,117 +27,116 @@ export const usersSeed: IUser[] = [
 export type ExerciseSeed = Omit<IExercise, 'isDeleted' | 'deletedAt'>;
 
 // Ejercicios repartidos entre todas las categorías de EXERCISE_CATEGORIES.
-// En los ejercicios de fuerza, sets son las series y reps las repeticiones de cada serie.
+// El catalogo solo tiene nombre y categoria: las series y repeticiones las pone cada rutina.
 export const exercisesSeed: ExerciseSeed[] = [
     {
         name: 'Press de banca',
-        category: 'CHEST',
-        sets: 4,
-        reps: 10
+        category: 'CHEST'
     },
     {
         name: 'Aperturas con mancuernas',
-        category: 'CHEST',
-        sets: 3,
-        reps: 12
+        category: 'CHEST'
     },
     {
         name: 'Dominadas',
-        category: 'BACK',
-        sets: 4,
-        reps: 8
+        category: 'BACK'
     },
     {
         name: 'Remo con barra',
-        category: 'BACK',
-        sets: 4,
-        reps: 10
+        category: 'BACK'
     },
     {
         name: 'Sentadilla',
-        category: 'LEGS',
-        sets: 5,
-        reps: 5
+        category: 'LEGS'
     },
     {
         name: 'Prensa de piernas',
-        category: 'LEGS',
-        sets: 3,
-        reps: 12
+        category: 'LEGS'
     },
     {
         name: 'Press militar',
-        category: 'SHOULDERS',
-        sets: 4,
-        reps: 8
+        category: 'SHOULDERS'
     },
     {
         name: 'Elevaciones laterales',
-        category: 'SHOULDERS',
-        sets: 3,
-        reps: 15
+        category: 'SHOULDERS'
     },
     {
         name: 'Curl de bíceps',
-        category: 'ARMS',
-        sets: 3,
-        reps: 12
+        category: 'ARMS'
     },
     {
         name: 'Fondos en paralelas',
-        category: 'ARMS',
-        sets: 3,
-        reps: 10
+        category: 'ARMS'
     },
     {
         name: 'Plancha abdominal',
-        category: 'CORE',
-        sets: 3,
-        reps: 1
+        category: 'CORE'
     },
-    // En el cardio no hay repeticiones: sets son los minutos de trabajo y reps queda en 0.
     {
         name: 'Cinta a intervalos',
-        category: 'CARDIO',
-        sets: 20,
-        reps: 0
+        category: 'CARDIO'
     }
 ];
 
-// Cada rutina dice de qué ejercicios está hecha con sus nombres. El script del seed los cambia
-// por los ids que MongoDB les ha dado a los ejercicios, por eso primero se insertan los ejercicios.
-// Los campos 'exercises' e 'isDeleted' tampoco se indican aquí: el esquema los pone por defecto.
-export type WorkoutSeed = Omit<IWorkout, 'exercises' | 'isDeleted' | 'deletedAt'> & { exerciseNames: string[] };
+// Las rutinas son del usuario 'user@example.com' (el seed pone el dueño al insertarlas).
+// Cada ejercicio de la rutina dice su nombre, que el script del seed cambia por el id que MongoDB
+// ha dado al ejercicio, y sus propias series y repeticiones. El orden de la lista es el orden de la rutina.
+// Los campos 'owner', 'exercises' e 'isDeleted' no se indican aquí: el seed o el esquema los ponen.
+export type WorkoutSeed = Omit<IWorkout, 'owner' | 'exercises' | 'isDeleted' | 'deletedAt'> & {
+    exerciseItems: { name: string; sets: number; reps: number }[];
+};
 
 export const workoutsSeed: WorkoutSeed[] = [
     {
         name: 'Día de pecho',
         description: 'Empuje con barra y mancuernas, y fondos para terminar de cansar el pecho.',
-        dayOfWeek: 'MONDAY',
-        exerciseNames: ['Press de banca', 'Aperturas con mancuernas', 'Fondos en paralelas']
+        days: ['MONDAY'],
+        exerciseItems: [
+            { name: 'Press de banca', sets: 4, reps: 10 },
+            { name: 'Aperturas con mancuernas', sets: 3, reps: 12 },
+            { name: 'Fondos en paralelas', sets: 3, reps: 10 }
+        ]
     },
     {
         name: 'Día de espalda',
         description: 'Tirón vertical y horizontal, con bíceps al final.',
-        dayOfWeek: 'TUESDAY',
-        exerciseNames: ['Dominadas', 'Remo con barra', 'Curl de bíceps']
+        days: ['TUESDAY'],
+        exerciseItems: [
+            { name: 'Dominadas', sets: 4, reps: 8 },
+            { name: 'Remo con barra', sets: 4, reps: 10 },
+            { name: 'Curl de bíceps', sets: 3, reps: 12 }
+        ]
     },
     {
-        name: 'Día de piernas',
+        name: 'Pierna',
         description: 'Sentadilla y prensa, con plancha para cerrar el entrenamiento.',
-        dayOfWeek: 'THURSDAY',
-        exerciseNames: ['Sentadilla', 'Prensa de piernas', 'Plancha abdominal']
+        days: ['MONDAY', 'THURSDAY'],
+        exerciseItems: [
+            { name: 'Sentadilla', sets: 4, reps: 10 },
+            { name: 'Prensa de piernas', sets: 3, reps: 12 },
+            { name: 'Plancha abdominal', sets: 3, reps: 1 }
+        ]
     },
     {
         name: 'Día de hombro y brazos',
         description: 'Hombro completo y un bloque corto de brazos.',
-        dayOfWeek: 'FRIDAY',
-        exerciseNames: ['Press militar', 'Elevaciones laterales', 'Curl de bíceps', 'Fondos en paralelas']
+        days: ['FRIDAY'],
+        exerciseItems: [
+            { name: 'Press militar', sets: 4, reps: 8 },
+            { name: 'Elevaciones laterales', sets: 3, reps: 15 },
+            { name: 'Curl de bíceps', sets: 3, reps: 12 },
+            { name: 'Fondos en paralelas', sets: 3, reps: 10 }
+        ]
     },
     {
+        // Sin días: no sale en el calendario hasta que el usuario le ponga alguno
         name: 'Cardio y core',
-        description: 'Sesión corta de cardio y abdomen para el fin de semana.',
-        dayOfWeek: 'SATURDAY',
-        exerciseNames: ['Cinta a intervalos', 'Plancha abdominal']
+        description: 'Sesión corta de cardio y abdomen. Los minutos de cardio van en las series.',
+        days: [],
+        exerciseItems: [
+            { name: 'Cinta a intervalos', sets: 20, reps: 1 },
+            { name: 'Plancha abdominal', sets: 3, reps: 1 }
+        ]
     }
 ];

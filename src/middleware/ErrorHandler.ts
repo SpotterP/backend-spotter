@@ -35,16 +35,17 @@ export const ErrorHandler: ErrorRequestHandler = (error: DatabaseError, req, res
 
     // Errores de la libreria jsonwebtoken: el token ha caducado o no es valido.
     // En los dos casos el usuario no esta identificado, asi que respondemos 401.
-    // Damos mensajes distintos para que el frontend sepa cuando le basta con renovar el token.
+    // El campo code es estable y el cliente decide con el si renueva la sesion; el mensaje se
+    // mantiene byte a byte porque hay clientes ya desplegados que lo comparan.
     // Va antes que el resto porque TokenExpiredError es un tipo de JsonWebTokenError.
     if (error instanceof TokenExpiredError) {
 
-        return res.status(401).json({ message: 'El token ha caducado' });
+        return res.status(401).json({ message: 'El token ha caducado', code: 'TOKEN_EXPIRED' });
     }
 
     if (error instanceof JsonWebTokenError) {
 
-        return res.status(401).json({ message: 'Token no válido' });
+        return res.status(401).json({ message: 'Token no válido', code: 'TOKEN_INVALID' });
     }
 
     // El codigo 11000 indica que se ha intentado introducir un valor duplicado

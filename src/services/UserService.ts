@@ -33,19 +33,29 @@ export const getUserById = (userId: string): Promise<HydratedDocument<IUserModel
 
 };
 
+// Datos del perfil del propio usuario (id, nombre, email y rol). Devuelve null si ya no existe o esta borrado
+export const getMe = (userId: string): Promise<HydratedDocument<IUserModel> | null> => {
+
+    // El rol va en la respuesta para que la app no tenga que guardarlo del login ni suponerlo
+    return User.findOne({ _id: userId, isDeleted: false }).select('name email role');
+
+};
+
 // Borrado logico: el usuario sigue en la base de datos, pero marcado como borrado.
 // Deja de salir en los listados y su email queda libre (indice unico parcial del modelo).
+// Subimos tambien la version de tokens: asi los tokens que tuviera dejan de servir para siempre,
+// tambien si despues se recupera la cuenta. Al recuperarla hay que volver a iniciar sesion.
 // Devuelve null si no existe o ya estaba borrado.
 export const softDeleteUser = (userId: string): Promise<HydratedDocument<IUserModel> | null> => {
 
-    return User.findOneAndUpdate({ _id: userId, isDeleted: false }, { isDeleted: true, deletedAt: new Date() }, { new: true });
+    return User.findOneAndUpdate({ _id: userId, isDeleted: false }, { isDeleted: true, deletedAt: new Date(), $inc: { tokenVersion: 1 } }, { new: true });
 
 };
 
 // Borrado logico de varios usuarios a la vez. Devuelve cuantos se han borrado.
 export const softDeleteManyUsers = async (ids: string[]): Promise<number> => {
 
-    const result = await User.updateMany({ _id: { $in: ids }, isDeleted: false }, { isDeleted: true, deletedAt: new Date() });
+    const result = await User.updateMany({ _id: { $in: ids }, isDeleted: false }, { isDeleted: true, deletedAt: new Date(), $inc: { tokenVersion: 1 } });
 
     return result.modifiedCount;
 
@@ -88,6 +98,14 @@ export const updateUser = (userId: string, data: UpdateUserInput): Promise<Hydra
         // vuelva a cifrar la contraseña si ha cambiado.
         Object.assign(user, data);
 
+        // Si el cambio trae contraseña, cerramos las sesiones que tuviera abiertas: subimos la
+        // version de tokens y sus access y refresh tokens dejan de valer. Cambiar solo el nombre
+        // o el email no cierra nada. Si quien cambia la contraseña es un ADMIN sobre otro usuario,
+        // las sesiones que se cierran son las del afectado, no las del admin.
+        if (data.password !== undefined) {
+            user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+        }
+
         // Guardamos los cambios en la base de datos
         return user.save();
 
@@ -99,15 +117,14 @@ export const updateUser = (userId: string, data: UpdateUserInput): Promise<Hydra
 // (sort es la columna por la que ordenar y order el sentido: asc o desc)
 export type ListUsersInput = { page: number; limit: number; search?: string; sort?: string; order?: 'asc' | 'desc' };
 
-// Devuelve una pagina de usuarios: solo _id y name.
-// El buscador mira SOLO el nombre: este listado lo puede llamar cualquier usuario con sesion
-// y no debe permitir descubrir emails de otros (por eso tampoco hay filtro por rol).
-// El ADMIN ve todos los usuarios, tambien los borrados logicamente; cualquier otra sesion
-// solo ve los activos.
-export const listUsers = async ({ page, limit, search, sort, order }: ListUsersInput, isAdmin: boolean) => {
+// Devuelve una pagina de usuarios: solo _id, name e isDeleted.
+// Solo lo llama un ADMIN, asi que el filtro no esconde los usuarios borrados logicamente.
+// El buscador mira SOLO el nombre y la proyeccion no lleva el email, asi que este listado
+// no permite descubrir emails de otros (por eso tampoco hay filtro por rol).
+export const listUsers = async ({ page, limit, search, sort, order }: ListUsersInput) => {
 
-    // El ADMIN consulta todo, asi que su filtro empieza vacio; el resto empieza solo con los activos
-    const filter: Record<string, unknown> = isAdmin ? {} : { isDeleted: false };
+    // El ADMIN ve tambien los usuarios borrados, asi que el filtro empieza vacio
+    const filter: Record<string, unknown> = {};
 
     // Buscador: el nombre contiene el texto, sin distinguir mayusculas
     if (search) {
@@ -117,7 +134,7 @@ export const listUsers = async ({ page, limit, search, sort, order }: ListUsersI
     // El nombre no es unico, asi que desempatamos con _id para que el orden sea estable entre paginas
     const [users, total] = await Promise.all([
         // Ordenamos por la columna pedida (por defecto el nombre)
-        User.find(filter).select(isAdmin ? '_id name isDeleted' : '_id name').sort(buildSort(sort, order, 'name')).skip(getSkip(page, limit)).limit(limit).lean(),
+        User.find(filter).select('_id name isDeleted').sort(buildSort(sort, order, 'name')).skip(getSkip(page, limit)).limit(limit).lean(),
         User.countDocuments(filter)
     ]);
 
@@ -140,6 +157,8 @@ export default {
     createUser,
 
     getUserById,
+
+    getMe,
 
     updateUser,
 

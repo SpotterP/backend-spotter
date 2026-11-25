@@ -14,7 +14,9 @@
         "seed": "tsx src/seed.ts",
         "migrate-roles": "tsx src/migrate-roles.ts",
         "lint": "oxlint src",
-        "lint:fix": "oxlint src --fix"
+        "test": "node --import tsx --test test/*.test.ts",
+        "lint:fix": "oxlint src --fix",
+        "prepare": "git config core.hooksPath .githooks || true"
     },
     "author": "",
     "license": "MIT",
@@ -27,6 +29,7 @@
         "joi-to-swagger": "^6.2.0",
         "jsonwebtoken": "^9.0.3",
         "mongoose": "^9.10.1",
+        "socket.io": "^4.8.4",
         "swagger-jsdoc": "^6.3.0",
         "swagger-ui-express": "^5.0.1"
     },
@@ -37,6 +40,7 @@
         "@types/node": "^24.0.0",
         "@types/swagger-jsdoc": "^6.0.4",
         "@types/swagger-ui-express": "^4.1.8",
+        "mongodb-memory-server": "^11.4.0",
         "oxlint": "^1.85.0",
         "tsx": "^4.23.15",
         "typescript": "~6.0.3"

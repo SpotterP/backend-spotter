@@ -4,10 +4,10 @@ import Workout from '../models/Workout';
 import { buildPageInfo, buildSort, escapeRegex, getSkip } from '../utils/pagination';
 
 // Datos necesarios para crear un ejercicio.
-export type NewExercise = Pick<IExercise, 'name' | 'category'> & { sets?: number; reps?: number };
+export type NewExercise = Pick<IExercise, 'name' | 'category'>;
 
 // Datos que se pueden actualizar de un ejercicio
-export type UpdateExerciseInput = Partial<Pick<IExercise, 'name' | 'category' | 'sets' | 'reps'>>;
+export type UpdateExerciseInput = Partial<Pick<IExercise, 'name' | 'category'>>;
 
 // Tipo de un documento de ejercicio ya cargado por Mongoose
 type ExerciseDocument = HydratedDocument<IExercise>;
@@ -53,7 +53,7 @@ export const hardDeleteExercise = async (exerciseId: string): Promise<ExerciseDo
     const exercise = await Exercise.findByIdAndDelete(exerciseId);
 
     if (exercise) {
-        await Workout.updateMany({ exercises: exercise._id }, { $pull: { exercises: exercise._id } });
+        await Workout.updateMany({ 'exercises.exercise': exercise._id }, { $pull: { exercises: { exercise: exercise._id } } });
     }
 
     return exercise;
@@ -76,7 +76,7 @@ export const hardDeleteManyExercises = async (ids: string[]): Promise<number> =>
     const result = await Exercise.deleteMany({ _id: { $in: ids } });
 
     if (result.deletedCount > 0) {
-        await Workout.updateMany({ exercises: { $in: ids } }, { $pull: { exercises: { $in: ids } } });
+        await Workout.updateMany({ 'exercises.exercise': { $in: ids } }, { $pull: { exercises: { exercise: { $in: ids } } } });
     }
 
     return result.deletedCount;

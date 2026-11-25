@@ -3,6 +3,7 @@ import express from 'express';
 import controller from '../controllers/Workout';
 
 import { Schemas, ValidateId, ValidateJoi, ValidateQuery } from '../middleware/Joi';
+import { RequireOwnerOrAdmin } from '../middleware/RequireOwnerOrAdmin';
 import { RequireRole } from '../middleware/RequireRole';
 
 // Creamos el router que se encargara de las rutas relacionadas con las rutinas
@@ -15,14 +16,14 @@ const router = express.Router();
  *     tags: [Workouts]
  *     summary: Crea una rutina
  *     description: >
- *       Solo un ADMIN puede crear rutinas.
- *       Los ejercicios se envian como una lista de ids (textos) de ejercicios ya existentes.
- *       La respuesta devuelve la rutina guardada, con esos mismos ids en exercises.
+ *       Solo un ADMIN puede crear rutinas. Puede indicar el dueño con `owner` (id de un usuario);
+ *       si no lo indica, la rutina es del propio ADMIN. Si el dueño o algún ejercicio no existe, responde 404. Cada ejercicio se envia como
+ *       { exercise, sets, reps } y el orden de la lista es el orden de la rutina.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
- *           schema: { $ref: '#/components/schemas/WorkoutInput' }
+ *           schema: { $ref: '#/components/schemas/WorkoutAdminInput' }
  *     responses:
  *       201:
  *         description: Rutina creada
@@ -31,9 +32,9 @@ const router = express.Router();
  *             schema: { $ref: '#/components/schemas/Workout' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
- *       500: { $ref: '#/components/responses/ServerError' }
  */
 
 /**
@@ -43,9 +44,9 @@ const router = express.Router();
  *     tags: [Workouts]
  *     summary: Lista las rutinas con paginación y buscador
  *     description: >
- *       Cada rutina lleva sus ejercicios completos. El buscador mira el nombre y la descripción.
+ *       Cada rutina lleva sus ejercicios completos y su dueño (`owner`, con su id y su nombre). El buscador mira el nombre y la descripción.
  *       Cualquier sesión con token puede consultarlo: un ADMIN ve todas las rutinas, también las
- *       borradas; el resto de usuarios solo ve las activas.
+ *       borradas, y puede filtrar por `owner`; un usuario normal solo ve sus propias rutinas activas.
  *     parameters:
  *       - in: query
  *         name: page
@@ -58,12 +59,17 @@ const router = express.Router();
  *         description: Texto que debe contener el nombre o la descripción (sin distinguir mayúsculas)
  *         schema: { type: string }
  *       - in: query
- *         name: dayOfWeek
+ *         name: day
+ *         description: Solo las rutinas que incluyen este día
  *         schema: { type: string, enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY] }
+ *       - in: query
+ *         name: owner
+ *         description: Solo las rutinas de este usuario (id del dueño)
+ *         schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
  *       - in: query
  *         name: sort
  *         description: Columna por la que se ordena (por defecto name)
- *         schema: { type: string, enum: [name, description, dayOfWeek] }
+ *         schema: { type: string, enum: [name, description] }
  *       - in: query
  *         name: order
  *         description: Sentido del orden (por defecto asc)
@@ -93,15 +99,15 @@ const router = express.Router();
  */
 
 // Ruta para listar rutinas: primero validamos los parametros de la URL
-// La lectura la puede hacer cualquier sesion: el controlador pasa el rol al servicio
-// y el servicio decide si devuelve solo las activas o todas
+// La lectura la puede hacer cualquier sesion: el controlador pasa el rol y el id del usuario al servicio
+// y el servicio decide: el ADMIN ve todas y un USER solo las suyas activas
 router.get('/', ValidateQuery(Schemas.query.workout), controller.listWorkouts);
 
 // Ruta para crear una rutina nueva
 // Solo ADMIN: escribir en el catalogo es cosa del backoffice
 // Primero comprobamos que los datos cumplen el esquema de Joi
 // Si son correctos llamamos a la funcion createWorkout del controlador
-router.post('/', RequireRole('ADMIN'), ValidateJoi(Schemas.workout.create), controller.createWorkout);
+router.post('/', RequireRole('ADMIN'), ValidateJoi(Schemas.workout.adminCreate), controller.createWorkout);
 
 /**
  * @openapi
@@ -190,8 +196,8 @@ router.delete('/hard', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), co
  *     description: >
  *       Los ejercicios se guardan como ids, pero esta respuesta los devuelve ya resueltos:
  *       cada elemento de exercises es un objeto Exercise entero, no un id.
- *       Cualquier sesión con token puede consultarlo. Un ADMIN ve también las rutinas borradas;
- *       para el resto, una rutina borrada responde 404.
+ *       Cualquier sesión con token puede consultarlo. Un ADMIN ve cualquier rutina, también las borradas;
+ *       un usuario normal solo ve las suyas, y si la rutina es de otro o está borrada responde 404.
  *     parameters:
  *       - in: path
  *         name: workoutId
@@ -217,9 +223,9 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  *     summary: Reemplaza los datos de una rutina
  *     description: >
  *       Hay que enviar la rutina entera, no solo los campos que cambian.
- *       Los ejercicios se envian como una lista de ids (textos) de ejercicios ya existentes.
- *       La respuesta devuelve la rutina actualizada, con esos mismos ids en exercises.
- *       Solo un ADMIN puede modificarla.
+ *       Cada ejercicio se envia como { exercise, sets, reps } y el orden de la lista es el orden de la rutina.
+ *       Solo un ADMIN puede cambiar el dueño con `owner`; si lo envia un usuario normal, se ignora.
+ *       La puede modificar un ADMIN (cualquier rutina) o el usuario dueño de la rutina; si es de otro usuario responde 404.
  *     parameters:
  *       - in: path
  *         name: workoutId
@@ -229,7 +235,7 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  *       required: true
  *       content:
  *         application/json:
- *           schema: { $ref: '#/components/schemas/WorkoutInput' }
+ *           schema: { $ref: '#/components/schemas/WorkoutAdminInput' }
  *     responses:
  *       200:
  *         description: Rutina actualizada. Al actualizar, los ejercicios se devuelven como ids, no como objetos.
@@ -238,16 +244,15 @@ router.get('/:workoutId', ValidateId('workoutId'), controller.readWorkout);
  *             schema: { $ref: '#/components/schemas/Workout' }
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
- *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
  */
 
 // Ruta para actualizar una rutina
-// Solo ADMIN, igual que la creacion: el catalogo lo mantiene el backoffice
-// Primero comprobamos que el ID sea correcto y despues validamos los datos recibidos
-router.put('/:workoutId', RequireRole('ADMIN'), ValidateId('workoutId'), ValidateJoi(Schemas.workout.update), controller.updateWorkout);
+// ADMIN (cualquier rutina) o el dueño de la rutina (solo las suyas)
+// Primero comprobamos que el ID sea correcto, despues quien es el dueño y por ultimo validamos los datos recibidos
+router.put('/:workoutId', ValidateId('workoutId'), RequireOwnerOrAdmin, ValidateJoi(Schemas.workout.adminUpdate), controller.updateWorkout);
 
 // Exportamos el router para poder utilizar estas rutas en la aplicacion
 /**
@@ -258,7 +263,7 @@ router.put('/:workoutId', RequireRole('ADMIN'), ValidateId('workoutId'), Validat
  *     summary: Borrado lógico de una rutina
  *     description: >
  *       Marca la rutina como borrada (isDeleted). Sigue en la base de datos, pero deja de salir
- *       en los listados y su nombre queda libre. Solo ADMIN.
+ *       en los listados y su nombre queda libre. La puede borrar un ADMIN (cualquier rutina) o el usuario dueño; si es de otro usuario responde 404.
  *     parameters:
  *       - in: path
  *         name: workoutId
@@ -268,12 +273,11 @@ router.put('/:workoutId', RequireRole('ADMIN'), ValidateId('workoutId'), Validat
  *       204: { description: Rutina borrada lógicamente }
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
- *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 
-// Borrado logico: solo marca la rutina como borrada
-router.delete('/:workoutId', RequireRole('ADMIN'), ValidateId('workoutId'), controller.softDeleteWorkout);
+// Borrado logico: solo marca la rutina como borrada. ADMIN o el dueño de la rutina
+router.delete('/:workoutId', ValidateId('workoutId'), RequireOwnerOrAdmin, controller.softDeleteWorkout);
 
 /**
  * @openapi

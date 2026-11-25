@@ -46,6 +46,12 @@ Y para aplicar las correcciones automáticas que tenga:
 npm run lint:fix
 ```
 
+### Hook de Git: linter antes de cada commit
+
+Al hacer `npm install` se activa solo un hook de Git (`.githooks/pre-commit`, lo configura el script `prepare`).
+Antes de cada `git commit` pasa `npm run lint`: si el linter encuentra un error, el commit se cancela y dice qué arreglar.
+Si hace falta, se puede saltar una vez con `git commit --no-verify`, pero lo normal es arreglar el aviso.
+
 ## Endpoints
 
 Todo salvo `/auth/*`, `/ping` y `/api-docs` pide el token en la cabecera `Authorization: Bearer <token>`.
@@ -98,17 +104,42 @@ y `POST /auth/refresh` responden 401 con sus credenciales, como si no existiera.
 
 Los cuerpos que se envían:
 
-- **Ejercicios**: `name`, `category` (una de `CHEST`, `BACK`, `LEGS`, `SHOULDERS`, `ARMS`, `CORE`, `CARDIO`),
-  `sets` y `reps` (enteros, opcionales).
-- **Rutinas**: `name`, `description` (opcional), `dayOfWeek` (de `MONDAY` a `SUNDAY`) y `exercises`, que se
-  envía como lista de ids de ejercicio y se devuelve como lista de objetos `Exercise` completos al leer por id.
+- **Ejercicios** (catálogo): `name` y `category` (una de `CHEST`, `BACK`, `LEGS`, `SHOULDERS`, `ARMS`, `CORE`, `CARDIO`).
+- **Rutinas**: `name`, `description` (opcional), `days` (lista de `MONDAY` a `SUNDAY`, puede estar vacía) y
+  `exercises`, una lista de `{ exercise, sets, reps }`: el id del ejercicio del catálogo y sus series y repeticiones
+  en esa rutina. El orden de la lista es el orden de la rutina, y al leer cada `exercise` sale como objeto completo.
+  Cada rutina tiene un dueño (`owner`) y el nombre es único por usuario.
+- **Mis rutinas** (rol USER): `GET` y `POST /users/me/workouts`, y `GET`, `PUT` y `DELETE`
+  `/users/me/workouts/:workoutId`. Cada usuario solo ve y toca las suyas; una rutina de otro responde 404.
 - **Usuarios**: `name`, `email`, `password` (8 caracteres como mínimo) y `role` (`ADMIN` o `USER`).
+
+## Tiempo real (Socket.IO)
+
+La API avisa en tiempo real cuando un usuario guarda un entrenamiento. Socket.IO va sobre el mismo servidor y el mismo puerto que la API.
+Swagger no documenta los sockets, así que se explica aquí.
+
+- **Conexión:** hay que enviar el access token en el handshake, `io(url, { auth: { token } })`. Sin token, o con uno caducado o falso, la conexión se rechaza con un error.
+- **Sala:** al conectar, cada usuario entra en su sala personal `user:<id>`. Solo recibe sus propios avisos.
+- **Evento `session:created`:** lo recibe el usuario cuando guarda un entrenamiento con `POST /users/me/sessions`. Trae el entrenamiento guardado.
+  Si el usuario no tiene ninguna conexión abierta, el entrenamiento se guarda igual (201).
+
+Ejemplo de cliente (con `socket.io-client`):
+
+```js
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:1337', { auth: { token } });
+
+socket.on('session:created', (session) => console.log('Entrenamiento nuevo', session));
+socket.on('connect_error', (error) => console.log('No se pudo conectar:', error.message));
+```
 
 ## Estructura del proyecto
 
 ```
 src/
   server.ts        Punto de entrada: conecta con MongoDB, registra middleware y rutas, y arranca el servidor
+  socket.ts        Socket.IO: crea el servidor de sockets, una sala por usuario y emitToUser()
   seed.ts          Script que llena la base de datos con los datos de ejemplo
   migrate-roles.ts Script de una sola vez: pasa los roles antiguos (admin, user) a ADMIN y USER
   seed-data.ts     Los datos de ejemplo: usuarios, ejercicios y rutinas
@@ -129,6 +160,7 @@ src/
     VerifyToken.ts   Comprueba el token de la cabecera Authorization y deja el usuario en req.user (401)
     RequireRole.ts   Deja pasar solo a un rol concreto (403)
     Joi.ts           Guardas: validan el body (422) y el id de la URL (400)
+    SocketAuth.ts    Comprueba el token en la conexion de Socket.IO y la rechaza si no vale
     Cors.ts          Cabeceras de CORS, configuradas con CORS_ORIGIN
     Logger.ts        Escribe en consola cada petición y su código de respuesta
     ErrorHandler.ts  Convierte cualquier error en su código: 400, 401, 404, 409, 422 o 500

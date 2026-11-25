@@ -6,10 +6,14 @@ import { Cors } from './middleware/Cors';
 import Logging from './library/Logging';
 import Logger from './middleware/Logger';
 import ErrorHandler from './middleware/ErrorHandler';
+import { initSocket } from './socket';
 import { VerifyToken } from './middleware/VerifyToken';
 import authRoutes from './routes/Auth';
 import exerciseRoutes from './routes/Exercise';
 import workoutRoutes from './routes/Workout';
+import myWorkoutRoutes from './routes/MyWorkouts';
+import sessionRoutes from './routes/Session';
+import progressRoutes from './routes/Progress';
 import swaggerUi from 'swagger-ui-express'; // permite mostrar Swagger en el navegador.
 import swaggerDocument from './config/swagger'; // importa el documento que hemos creado en swagger.ts
 const router = express();
@@ -47,6 +51,10 @@ const StartServer = () => {
     // La lista de usuarios (solo id y nombre) la puede consultar cualquier usuario autenticado.
     // Las escrituras (POST y PUT) y el detalle por id son solo para ADMIN, y eso se comprueba
     // en src/routes/Users.ts, porque aquí el montaje es el mismo para todas las rutas del router.
+    // Las rutinas del propio usuario van ANTES que /users: asi "me" no se confunde con un :userId.
+    router.use('/users/me/workouts', VerifyToken, myWorkoutRoutes);
+    router.use('/users/me/sessions', VerifyToken, sessionRoutes);
+    router.use('/users/me/progress', VerifyToken, progressRoutes);
     router.use('/users', VerifyToken, userRoutes);
 
     // La documentacion y el healthcheck son publicos
@@ -77,5 +85,18 @@ const StartServer = () => {
     router.use(ErrorHandler);
 
     const server = http.createServer(router);
-server.listen(config.server.port, () => Logging.info(`Server is running on port ${config.server.port}`));
+    // Socket.IO comparte el servidor HTTP: los avisos en tiempo real van por el mismo puerto
+    initSocket(server);
+
+    // La direccion de escucha es opcional: si HOST no esta en el .env se llama a listen sin
+    // direccion, que es como estaba antes y escucha en todas las interfaces. Se pide en el
+    // .env cuando hace falta dejar escrito por donde entra el proxy o la red interna.
+    const onListening = () =>
+        Logging.info(`Server is running on ${config.server.host ?? 'all interfaces'}, port ${config.server.port}`);
+
+    if (config.server.host) {
+        server.listen(config.server.port, config.server.host, onListening);
+    } else {
+        server.listen(config.server.port, onListening);
+    }
 };

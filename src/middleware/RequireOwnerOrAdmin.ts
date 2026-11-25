@@ -1,0 +1,34 @@
+import { NextFunction, Request, Response } from 'express';
+import Workout from '../models/Workout';
+
+// Middleware para las rutas de una rutina concreta (/workouts/:workoutId).
+// Deja pasar a un ADMIN con cualquier rutina, y a un USER solo si la rutina es suya.
+// Va despues de VerifyToken (que rellena req.user) y de ValidateId.
+export const RequireOwnerOrAdmin = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.user) {
+            // Mismo code que el resto de 401 por falta de sesión: el cliente decide por código
+            return res.status(401).json({ message: 'Falta el token', code: 'TOKEN_MISSING' });
+        }
+
+        // El ADMIN puede tocar las rutinas de todo el mundo
+        if (req.user.role === 'ADMIN') {
+            return next();
+        }
+
+        // Buscamos la rutina para ver de quien es
+        const workout = await Workout.findById(req.params.workoutId).select('owner');
+
+        // Si la rutina no existe seguimos: el controlador responde 404
+        // Si existe pero es de otro usuario respondemos tambien 404: asi no se revela que existe
+        if (workout && String(workout.owner) !== req.user.id) {
+            return res.status(404).json({ message: 'not found' });
+        }
+
+        next();
+    } catch (error) {
+        next(error);
+    }
+};
+
+export default RequireOwnerOrAdmin;

@@ -15,8 +15,8 @@ const router = express.Router();
  *     summary: Lista los usuarios
  *     description: >
  *       Devuelve solo el id y el nombre de cada usuario, con paginación y buscador por nombre.
- *       Cualquier usuario con token puede consultarla. Un ADMIN ve también los usuarios borrados;
- *       el resto solo ve los activos.
+ *       Solo ADMIN, que es el único que puede ver también los usuarios borrados lógicamente;
+ *       cualquier otro usuario recibe 403.
  *     parameters:
  *       - in: query
  *         name: page
@@ -61,12 +61,13 @@ const router = express.Router();
  *                     hasNextPage: { type: boolean }
  *                     hasPrevPage: { type: boolean }
  *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
- *       500: { $ref: '#/components/responses/ServerError' }
  */
 
-// Devuelve el listado de usuarios disponibles.
-router.get('/', ValidateQuery(Schemas.query.user), controller.listUsers);
+// Listado de usuarios. Solo ADMIN: el backoffice es quien lo consume, y el listado lleva
+// tambien los usuarios borrados logicamente, que un usuario normal no debe ver
+router.get('/', RequireRole('ADMIN'), ValidateQuery(Schemas.query.user), controller.listUsers);
 
 /**
  * @openapi
@@ -85,7 +86,6 @@ router.get('/', ValidateQuery(Schemas.query.user), controller.listUsers);
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
- *       500: { $ref: '#/components/responses/ServerError' }
  */
 
 // Ruta para crear un usuario nuevo
@@ -101,7 +101,7 @@ router.post('/', RequireRole('ADMIN'), ValidateJoi(Schemas.user.create), control
  *     summary: Borrado lógico de varios usuarios
  *     description: >
  *       Marca como borrados (isDeleted) los usuarios cuyos ids se envían en el cuerpo. Los que no existen
- *       o ya estaban borrados no cuentan. Si la lista incluye al propio admin responde 400. Solo ADMIN.
+ *       o ya estaban borrados no cuentan. Si la lista incluye al propio admin responde 403. Solo ADMIN.
  *     requestBody:
  *       required: true
  *       content:
@@ -140,7 +140,7 @@ router.delete('/', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), contro
  *     summary: Borrado definitivo de varios usuarios
  *     description: >
  *       Elimina de la base de datos los usuarios cuyos ids se envían en el cuerpo. No se puede deshacer.
- *       Si la lista incluye al propio admin responde 400. Solo ADMIN.
+ *       Si la lista incluye al propio admin responde 403. Solo ADMIN.
  *     requestBody:
  *       required: true
  *       content:
@@ -170,6 +170,37 @@ router.delete('/', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), contro
 
 // Borrado definitivo multiple
 router.delete('/hard', RequireRole('ADMIN'), ValidateJoi(Schemas.bulkDelete), controller.hardDeleteManyUsers);
+
+/**
+ * @openapi
+ * /users/me:
+ *   get:
+ *     tags: [Users]
+ *     summary: Devuelve mi perfil
+ *     description: >
+ *       Devuelve el id, el nombre, el email y el rol del usuario de la sesión. El usuario sale del token,
+ *       así que cada uno solo ve el suyo. Lo puede usar cualquier usuario con token.
+ *     responses:
+ *       200:
+ *         description: Mi perfil
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     _id: { type: string, example: 6ab3f2fe9c500204a7d5f8a1 }
+ *                     name: { type: string, example: Marta }
+ *                     email: { type: string, example: marta@example.com }
+ *                     role: { type: string, enum: [ADMIN, USER], example: USER }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+
+// Perfil del usuario de la sesion. Tiene que ir ANTES de /:userId, porque si no "me" se tomaria como un id
+router.get('/me', controller.readMe);
 
 /**
  * @openapi
@@ -241,7 +272,7 @@ router.put('/:userId', RequireRole('ADMIN'), ValidateId('userId'), ValidateJoi(S
  *     summary: Borrado lógico de un usuario
  *     description: >
  *       Marca al usuario como borrado (isDeleted). Sigue en la base de datos, pero deja de salir
- *       en los listados y su email queda libre. Solo ADMIN. Un admin no puede borrarse a sí mismo.
+ *       en los listados y su email queda libre. Solo ADMIN. Un admin no puede borrarse a sí mismo (403).
  *     parameters:
  *       - in: path
  *         name: userId
@@ -290,7 +321,7 @@ router.patch('/:userId/restore', RequireRole('ADMIN'), ValidateId('userId'), con
  *     summary: Borrado definitivo de un usuario
  *     description: >
  *       Elimina al usuario de la base de datos para siempre. No se puede deshacer.
- *       Solo ADMIN. Un admin no puede borrarse a sí mismo.
+ *       Solo ADMIN. Un admin no puede borrarse a sí mismo (403).
  *     parameters:
  *       - in: path
  *         name: userId

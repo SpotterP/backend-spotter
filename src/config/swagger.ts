@@ -15,6 +15,8 @@ const { swagger: refreshInput } = j2s(Schemas.auth.refresh);
 const { swagger: userInput } = j2s(Schemas.user.create);
 const { swagger: exerciseInput } = j2s(Schemas.exercise.create);
 const { swagger: workoutInput } = j2s(Schemas.workout.create);
+const { swagger: workoutAdminInput } = j2s(Schemas.workout.adminCreate);
+const { swagger: sessionInput } = j2s(Schemas.session.create);
 
 // Lo que devuelve la API no es igual a lo que se envía: lleva el _id, las fechas que
 // pone MongoDB y las marcas del borrado lógico, que no se envían nunca en el body.
@@ -34,13 +36,53 @@ const userSchema = { type: 'object', properties: { ...storedFields, ...userField
 
 const exerciseSchema = { type: 'object', properties: { ...storedFields, ...exerciseInput.properties } };
 
-// Una rutina guardada lleva los ejercicios como ids, porque así se envían y así se guardan.
-const workoutSchema = { type: 'object', properties: { ...storedFields, ...workoutInput.properties } };
+// Una rutina guardada lleva el dueño (owner) y cada ejercicio como { exercise: id, sets, reps }.
+const workoutSchema = {
+    type: 'object',
+    properties: { ...storedFields, owner: { type: 'string', example: '6ab3f2fe9c500204a7d5f8a2' }, ...workoutInput.properties }
+};
 
-// Al leer una rutina por su id, el servicio hace populate y devuelve los ejercicios enteros.
+// Al leer una rutina el servicio hace populate y devuelve cada ejercicio del catálogo entero,
+// junto con las series y repeticiones de esa rutina.
 const populatedWorkoutSchema = {
     type: 'object',
-    properties: { ...storedFields, ...workoutInput.properties, exercises: { type: 'array', items: exerciseSchema } }
+    properties: {
+        ...workoutSchema.properties,
+        exercises: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    exercise: exerciseSchema,
+                    sets: { type: 'integer', example: 4 },
+                    reps: { type: 'integer', example: 10 }
+                }
+            }
+        }
+    }
+};
+
+// Un entrenamiento guardado lleva el usuario, la rutina (si la hay) y las fechas. Al leerlo,
+// cada ejercicio sale entero (populate) con sus series.
+const sessionSchema = {
+    type: 'object',
+    properties: {
+        _id: storedFields._id,
+        createdAt: storedFields.createdAt,
+        updatedAt: storedFields.updatedAt,
+        user: { type: 'string', example: '6ab3f2fe9c500204a7d5f8a2' },
+        ...sessionInput.properties,
+        exercises: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    exercise: exerciseSchema,
+                    sets: { type: 'array', items: { type: 'object', properties: { reps: { type: 'integer', example: 10 }, weight: { type: 'number', example: 60 } } } }
+                }
+            }
+        }
+    }
 };
 
 // Ejemplos que se ven en la página de Swagger, con datos del dominio del gimnasio
@@ -48,8 +90,6 @@ const exerciseExample = {
     _id: '6ab3f2fe9c500204a7d5f8b1',
     name: 'Press de banca',
     category: 'CHEST',
-    sets: 4,
-    reps: 10,
     createdAt: '2026-09-23T10:00:00.000Z',
     updatedAt: '2026-09-23T10:00:00.000Z',
     isDeleted: false,
@@ -60,15 +100,16 @@ const workoutExample = {
     _id: '6ab3f2fe9c500204a7d5f8c1',
     name: 'Día de pecho',
     description: 'Press de banca y aperturas para terminar.',
-    dayOfWeek: 'MONDAY',
-    exercises: [exerciseExample._id],
+    owner: '6ab3f2fe9c500204a7d5f8a2',
+    days: ['MONDAY', 'THURSDAY'],
+    exercises: [{ exercise: exerciseExample._id, sets: 4, reps: 10 }],
     createdAt: '2026-09-23T10:00:00.000Z',
     updatedAt: '2026-09-23T10:00:00.000Z',
     isDeleted: false,
     deletedAt: null
 };
 
-const populatedWorkoutExample = { ...workoutExample, exercises: [exerciseExample] };
+const populatedWorkoutExample = { ...workoutExample, exercises: [{ exercise: exerciseExample, sets: 4, reps: 10 }] };
 
 // Una respuesta correcta: el esquema de lo que se devuelve y un ejemplo con datos de verdad
 const okResponse = (description: string, schema: object, example: object) => ({
@@ -86,6 +127,28 @@ const errorResponse = (description: string, message: string) => ({
                 properties: { message: { type: 'string' } }
             },
             example: { message }
+        }
+    }
+});
+
+// Los cuatro codigos estables de los 401 del flujo de token. El cliente decide con ellos si
+// renueva la sesion, sin comparar el texto del mensaje, que se mantiene igual por los clientes
+// ya desplegados.
+const unauthorizedCodes = ['TOKEN_MISSING', 'TOKEN_INVALID', 'TOKEN_EXPIRED', 'SESSION_REVOKED'];
+
+// El 401 del flujo de token lleva message y code: es el unico error con esa forma
+const unauthorizedResponse = (description: string, message: string, code: string) => ({
+    description,
+    content: {
+        'application/json': {
+            schema: {
+                type: 'object',
+                properties: {
+                    message: { type: 'string' },
+                    code: { type: 'string', enum: unauthorizedCodes }
+                }
+            },
+            example: { message, code }
         }
     }
 });
@@ -117,7 +180,10 @@ const swaggerDocument = swaggerJsdoc({
             { name: 'Auth', description: 'Registro, login y renovación del token' },
             { name: 'Exercises', description: 'Ejercicios del gimnasio' },
             { name: 'Workouts', description: 'Rutinas, con los ejercicios que las forman' },
-            { name: 'Users', description: 'Usuarios del backoffice' }
+            { name: 'Users', description: 'Usuarios del backoffice' },
+            { name: 'My progress', description: 'Progreso del propio usuario: entrenamientos, días y ejercicios' },
+            { name: 'My sessions', description: 'Entrenamientos realizados por el propio usuario' },
+            { name: 'My workouts', description: 'Rutinas del propio usuario: crea, ve y toca solo las suyas' }
         ],
         // Por defecto todas las rutas piden el token (el candado de Swagger).
         // Las rutas públicas lo quitan con security: [] en su comentario @openapi.
@@ -137,7 +203,11 @@ const swaggerDocument = swaggerJsdoc({
                 ExerciseInput: exerciseInput,
                 Exercise: exerciseSchema,
                 WorkoutInput: workoutInput,
-                Workout: workoutSchema
+                WorkoutAdminInput: workoutAdminInput,
+                Workout: workoutSchema,
+                WorkoutPopulated: populatedWorkoutSchema,
+                SessionInput: sessionInput,
+                Session: sessionSchema
             },
             responses: {
                 LoginOk: okResponse(
@@ -153,7 +223,7 @@ const swaggerDocument = swaggerJsdoc({
                     { token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', user: userExample }
                 ),
                 BadCredentials: errorResponse('El email o la contraseña no son correctos', 'Email o contraseña incorrectos'),
-                Unauthorized: errorResponse('Falta el token, ha caducado o no es válido', 'El token ha caducado'),
+                Unauthorized: unauthorizedResponse('Falta el token, ha caducado o no es válido', 'El token ha caducado', 'TOKEN_EXPIRED'),
                 Forbidden: errorResponse('El usuario no tiene el rol necesario', 'Necesitas el rol ADMIN'),
                 UserOne: okResponse('Un usuario, con la contraseña ya quitada', { type: 'object', properties: { user: userSchema } }, { user: userExample }),
                 ExerciseOne: okResponse('Un ejercicio', { type: 'object', properties: { exercise: exerciseSchema } }, { exercise: exerciseExample }),

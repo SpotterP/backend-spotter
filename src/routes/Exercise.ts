@@ -26,7 +26,6 @@ const router = express.Router();
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *       422: { $ref: '#/components/responses/Unprocessable' }
- *       500: { $ref: '#/components/responses/ServerError' }
  */
 
 /**
@@ -55,7 +54,7 @@ const router = express.Router();
  *       - in: query
  *         name: sort
  *         description: Columna por la que se ordena (por defecto name)
- *         schema: { type: string, enum: [name, category, sets, reps] }
+ *         schema: { type: string, enum: [name, category] }
  *       - in: query
  *         name: order
  *         description: Sentido del orden (por defecto asc)
