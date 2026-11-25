@@ -3,6 +3,7 @@ import net from 'net';
 import path from 'path';
 
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import mongoose from 'mongoose';
 
 // Levanta una API de verdad para los tests: un Mongo propio en memoria y el servidor arrancado
 // con tsx en un puerto libre. Los tests hablan por HTTP y no importan nada de src/, porque lo
@@ -13,6 +14,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 
 export interface TestServer {
     baseUrl: string;
+    mongoUrl: string;
     // Cierra el servidor y el Mongo. Se llama siempre, aunque un test falle
     close: () => Promise<void>;
 }
@@ -103,5 +105,22 @@ export const startTestServer = async (): Promise<TestServer> => {
         throw error;
     }
 
-    return { baseUrl, close };
+    return { baseUrl, mongoUrl, close };
+};
+
+// Cambia el rol de un usuario ya creado. No hay forma de hacerlo por HTTP a proposito (nadie se
+// asciende a si mismo), asi que los tests de permisos necesitan un ADMIN y lo crean por la puerta
+// de atras. Va contra la misma base que levanto startTestServer.
+export const setUserRole = async (mongoUrl: string, email: string, role: 'ADMIN' | 'USER') => {
+    const connection = await mongoose.createConnection(mongoUrl).asPromise();
+
+    try {
+        const result = await connection.collection('users').updateOne({ email }, { $set: { role } });
+
+        if (result.matchedCount !== 1) {
+            throw new Error(`No hay ningun usuario con el email ${email}`);
+        }
+    } finally {
+        await connection.close();
+    }
 };
