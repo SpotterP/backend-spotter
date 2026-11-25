@@ -1,18 +1,18 @@
 name: CI
 
-# En dev, cada commit deja una imagen nueva: es lo que se despliega en ese entorno.
-# En un pull request contra dev solo se comprueba que compila y pasa el lint: no se publica nada.
-# Cuando pasemos a main, el disparador cambiará a tags de versión.
+# En main, cada commit deja una imagen nueva, etiquetada `latest`: es lo que se despliega.
+# En un pull request contra main solo se comprueba que compila y pasan los tests: no se publica nada.
+# Cada imagen lleva ademas su tag sha-<corto>, que es lo que permite volver a una version concreta.
 on:
   push:
-    branches: [dev]
+    branches: [main]
   pull_request:
-    branches: [dev]
+    branches: [main]
 
 # Los pushes se encolan en vez de pisarse: cada commit publica su tag sha-<corto>
-# y `dev` queda siempre en el último que termine.
+# y `latest` queda siempre en el último que termine.
 # GitHub puede descartar un run aún encolado si llegan varios pushes de golpe;
-# lo que no se pierde nunca es que `dev` acabe en el commit más nuevo.
+# lo que no se pierde nunca es que `latest` acabe en el commit más nuevo.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
@@ -40,7 +40,7 @@ jobs:
 
   image:
     name: Build and push image
-    # La imagen solo se publica cuando algo entra en dev, nunca desde un pull request.
+    # La imagen solo se publica cuando algo entra en main, nunca desde un pull request.
     if: github.event_name == 'push'
     needs: verify
     runs-on: ubuntu-latest
@@ -75,5 +75,5 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           tags: |
-            ${{ steps.image.outputs.name }}:dev
+            ${{ steps.image.outputs.name }}:latest
             ${{ steps.image.outputs.name }}:sha-${{ steps.image.outputs.sha_short }}
